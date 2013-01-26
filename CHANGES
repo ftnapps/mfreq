@@ -1,0 +1,102 @@
+------------------------------------------------------------------------------
+
+                           Changes for mfreq-suite
+
+                       (c) 2012-2013 by Markus Reschke
+
+------------------------------------------------------------------------------
+
+* 2013-01 / Version 3.05
+
+mfreq-index:
+  - Added support for a binary file search feature in the request processor
+    by modifying the fileindex lookup file to store the filenumbers (= line#)
+    of the first and the last filename for a specific first character. Also
+    extended the fileindex function to write an offset file to store the
+    offset of each filename in the data file. See SetMode command for more
+    information.
+  - Fixed bug for recursive directory processing. After leaving a 
+    subdirectory an error was reported by mistake. Also added some more
+    logging in case of a problem.
+
+mfreq-srif:
+  - Added a binary file search feature for faster request processing. Modified
+    the read function for lookup files to support changes of the file format.
+    See new SetMode switch "BinarySearch"!
+  - Added detailed logging of file requests (SetMode switch "LogRequest").
+  - Added "IfListed" switch to frequest limits. 
+
+
+* 2013-01 / Version 3.04
+
+mfreq-index:
+  - Fixed parser bug for FileArea command. Depth and PW were parsed but
+    not used.
+  - Added SetMode command to set operation modes.
+  - Added automatic path aliasing to reduce the size of the index data file.
+    Aliases are written into an index alias file. This feature can be enabled
+    by the configuration (SetMode switch "PathAliases").
+  - Added automatic filepaths for the fileindex. For normal files the filepath
+    will be just the path with a trailing forward slash. This reduces the size
+    of the index data file.
+  - Added a file check to the Magic and MagicPath commands, to test if the
+    referred filepath is a regular file.
+  - Added Reset command to reset several things.
+
+mfreq-list:
+  - Added Reset command to reset several things.
+
+mfreq-srif:
+  - Fixed possible variable issue in the processing of multiple file
+    indexes.
+  - If a reqested file is found in the index but not accessible on disk
+    mfreq-srif reports "currently not available" now.
+  - Added support for automatic path aliasing and filepaths (see mfreq-index).
+
+
+* 2012-08 / Version 3.03
+
+mfreq-list:
+  - Added truncation of long filenames when writing filelists.
+
+
+* 2012-06 / Version 3.02
+
+all:
+  - Cleaned up logging.
+  - Fixed log error in command line parsing (null pointer).
+  - Fixed problem writing strings with '%' to files.
+  - Improved log feedback of quotation/quoting errors in Tokenize().
+  - Changed timestamp in file logging for better readability 
+    (new format: year-month-day hh:mm:ss).
+
+
+* 2012-05 / Version 3.01
+
+mfreq-list:
+  - Added multiline support for filelists.
+
+mfreq-srif:
+  - Improved SRIF parser to support statements lacking data.
+  - SRIF parser took only first part of sysops name if the full name
+    wasn't enclosed in quotation marks. Fixed!
+
+all:
+  - Replaced strcasecmp() orgies with keyword tables.
+  - Added sanity checks for main().
+  - Command line option "-h" caused error message. Fixed!
+
+
+* 2012-04 / Version 3.00
+
+all:
+  - Beta testing done.
+  - Fixed bugs.
+  - Added features.
+
+
+* 2012-01 / Version 3.00a
+
+all:
+  - Complete re-write started.
+

@@ -1,0 +1,919 @@
+
+------------------------------------------------------------------------------
+
+                              ReadMe for mfreq suite
+
+                         (c) 1994-2013 by Markus Reschke
+
+------------------------------------------------------------------------------
+
+
+* About
+
+mfreq is a suite of tools for FTS style file requesting. It consists of a
+file index generator, filelist generator and a SRIF compatible file request
+handler. The original version of mfreq was developed for the venerable
+Commodore Amiga (tm) back in the 1990ies.
+
+Features:
+  - case-sensitive and long filenames
+  - filenames with spaces
+  - magics
+  - ifcico-style magic files
+  - password protected files
+  - case-insensitive freqests (if enabled by cfg)
+  - request limits
+  - response netmail or text
+  - dir.bbs and files.bbs
+  - update of file description files
+  - multiline support for filelists
+  - tested with binkd and qico-xe
+
+
+* Updating
+
+If you update your current version of mfreq to a later one, always run
+mfreq-index to update your file indexes. There might be some changes
+in the file formats.
+
+
+* Copyright
+
+All files of the mfreq suite are coprighted by Markus Reschke.
+
+
+* License
+
+The mfreq suite is distributed under the EUPL v1.1. For details see 
+EUPL-v1.1.pdf or http://joinup.ec.europa.eu/software/page/eupl.
+
+
+
+------------------------------------------------------------------------------
+
+                                   mfreq-index
+
+------------------------------------------------------------------------------
+
+
+* About
+
+This tool scans fileechos and directories to create a file index for a fast
+frequest processing later on. It also takes care of magic file names. 
+
+
+* Usage
+
+The command line usage is:
+
+  mfreq-index [-h/-?] [-c <cfg filepath>] [-l <log filepath>]
+
+  -h/-?  prints usage information (optional)
+  -c     configuration filepath (optional)
+  -l     log filepath (optional)
+
+Whithout the -c option the default filepath "/etc/fido/mfreq/index.cfg" will
+be used as configuration file. The -l option overrides the LogFile command of
+the configuration file. If neither the -l option nor the LogFile command are
+given, nothing will be logged.
+
+
+* Hints
+
+mfreq-index collects all file data in memory until it writes the data into
+an index file. If you have to deal with memory contraints please group your
+file areas and create an index file for each group. The frequest handler
+will accept multiple index files.
+
+Symbolic file links are not supported for file areas or magic files. They
+will be not followed.
+
+
+* Configuration
+
+The configuration file is more like a list of commands, which are processed
+by mfreq-index to create the file index. It's a simple ASCII text file. For
+a quick setup you'll find an example configuration "index.cfg" in the
+sample-cfg directory.
+
+
++ Basic Syntax
+
+Empty lines and lines starting with a "#" are treated as comments. Any other
+lines should contain a valid command. Commands mostly got additional arguments
+and options. Arguments with spaces, like a filepath, should be enclosed in
+quotation marks, for example "/fido/my files".
+
+The command parser also supports following quoted special characters:
+  - \" for a literal "
+  - \\ for a literal \
+
+Outside quotations you may also use commas instead of whitespaces to separate
+options.
+
+
++ LogFile Command
+
+Syntax:
+  LogFile <log filepath>
+
+The LogFile command specifies a filepath to be used as log file. If the -l
+option of the command line is used, it will overwrite the LogFile command. This
+command may be used only once. The best practice is to place LogFile as
+first command in the configuration.
+
+To prevent running several instances of mfreq-index writing the same file
+index at the same time the logfile will be locked.
+
+mfreq-index logs when it's started or ended. If you see a log entry that the
+program ended with errors, please run it manually and check the standard
+output for finding the cause of the error. 
+
+
++ SetMode Command
+
+Syntax:
+  SetMode [PathAliases] [BinarySearch]
+
+With SetMode you enable following features: 
+
+  Switch         Feature
+  ----------------------------------------------
+  PathAliases    create path aliases
+  BinarySearch   enable binary filename search
+
+With PathAliases enabled mfreq-index creates automatically aliases for paths
+in the index data file and writes those aliases into the index alias file.
+That way the size of the index data file is decreased hugely. The drawback
+is that the request processing might take a little bit longer. This feature
+is supported just for regular files, not magics. 
+
+If you got a large filebase with tons of files you should enable the binary
+search feature to speed up filename searching for simple requests (no wildcard
+as first character). Enable this feature for the request processor too. The
+speed gain is achieved by creating an additional index file and using the
+well known binary search algorithm.
+
+
++ Reset Command
+
+Syntax:
+  Reset [SetMode]
+
+The Reset command does what you would expect :-) It resets several things
+back to their defaults:
+
+  Keyword        Action
+  -----------------------------------------------------
+  SetMode        resets all SetMode switches 
+  Excludes       clears the list of file excludes
+
+
++ Magic Command
+
+Syntax:
+  Magic <name> File <filepath> [PW <password>]
+
+The Magic command defines a frequest magic and its corresponding file. Add a
+magic command for each magic you want to serve. If you need to connect a
+single magic to several files add the same magic for each file.      
+
+A password may be specified optionally to limit access.
+
+
++ MagicPath Command
+
+Syntax:
+  MagicPath <path>
+
+The MagicPath command specifies a directory containing special magic files.
+Such a magic file contains a list of filepaths and its name is the magics
+name. This is used by ifcico for example. You may use this command multiple
+times. If any file excludes are defined they'll be considered.
+
+
++ Exclude Command
+
+Syntax:
+  Exclude <name or pattern>
+
+To exclude specific files from being indexed use the Exclude command and
+specify a name or a name pattern. A pattern supports following wildcards:
+  - ? for matching a single character
+  - * for matching any number of characters (including zero)
+
+Both wildcards may be used multiple times in a single pattern.
+
+Each Exclude command will add the given name or pattern to a list, which
+is consulted when the MagicPath or AreaDir command is executed. 
+
+
++ FileArea Command
+
+Syntax:
+  FileArea <path> [PW <password>] [Depth <levels>] [AutoMagic]
+
+With the FileArea command the files inside the given directory will be added
+to the file index. Use this command for each of your file areas/echos. If any
+file excludes are defined they'll be considered.
+
+A password may be specified optionally to limit access.
+
+The Depth argument enables directory recursion with a limit of the
+given levels. The level value should be in the range of 1 up to 10.  
+
+The AutoMagic switch will create a magic for each file with the file's
+extension dropped off. For example:
+  - myfile.zip -> myfile  
+
+
++ Index Command
+
+Syntax:
+  Index <filepath>
+
+The Index command writes all files in the file index to the specified
+filepath. Following files will be written:
+  - <filepath>.data
+  - <filepath>.lookup
+  - <filepath>.alias
+  - <filepath>.offset
+
+After writing the files the file index is emptied. So you could add other
+files and create another index for those by calling the Index command again.
+This might come in handy if you got memory contraints or you need different
+files indexes for some obscure reason :-) 
+ 
+
+* ToDo / Feature Requests
+
+Some stuff which needs to be fixed or would be nice to have:
+  - All done :-)
+
+
+
+------------------------------------------------------------------------------
+
+                                   mfreq-list
+
+------------------------------------------------------------------------------
+
+
+* About
+
+The mfreq-list tool creates filelists and cleans up description files if
+requested.
+
+
+* Hints
+
+Symbolic file links are not supported for file areas . They will be not
+followed.
+
+
+* Description Files
+
+Brief overview of file description files and their syntax. All files may have
+lines ending with a CR (carriage return / 13).
+
+
++ simple files.bbs
+
+Plain ASCII file containing one or more lines for each file. Lines should not
+exceed a length of 78 characters.
+
+Format:
+  <name 8.3>         [<counter>] <description>
+  [                              <more description>]
+
+Values:
+- name 8.3: DOS style filename (<8 chars name>.<3 chars extension>)
+- counter: download counter (usually [<number>])
+
+
++ extended files.bbs
+
+Plain ASCII file containing one or more lines for each file. Lines should not
+exceed a length of 78 characters
+
+Format:
+  <name 8.3> <size> <date> [<counter>] <description>
+  [                                    <more description>]
+
+Values:
+- name 8.3: DOS style filename (<8 chars name>.<3 chars extension>)
+- size: in bytes without commas
+- date: file date (usually MM-DD-YY)
+- counter: download counter (usually [<number>])
+
+
++ dir.bbs
+
+Plain ASCII file containing one line with the description of the directory.
+
+
++ descript.ion
+
+Plain ASCII file containing one line for each file.
+
+Format:
+  <name> <description>
+
+Long filenames are supported. Filenames with space(s) are enclosed in
+quotations marks.
+
+
+* Usage
+
+The command line usage is:
+
+  mfreq-list [-h/-?] [-c <cfg filepath>] [-l <log filepath>]
+
+  -h/-?  prints usage information (optional)
+  -c     configuration filepath (optional)
+  -l     log filepath (optional)
+
+Whithout the -c option the default filepath "/etc/fido/mfreq/list.cfg" will
+be used as configuration file. The -l option overrides the LogFile command of
+the configuration file. If neither the -l option nor the LogFile command are
+given, nothing will be logged.
+
+
+* Configuration
+
+The configuration file is more like a list of commands, which are processed
+by mfreq-list to create filelists. It's a simple ASCII text file. For a quick
+setup you'll find an example configuration "list.cfg" in the sample-cfg
+directory.
+
+
++ Basic Syntax
+
+Empty lines and lines starting with a "#" are treated as comments. Any other
+lines should contain a valid command. Commands mostly got additional arguments
+and options. Arguments with spaces, like a filepath, should be enclosed in
+quotation marks, for example "/fido/my files".
+
+The command parser also supports following quoted special characters:
+  - \" for a literal "
+  - \\ for a literal \
+
+Outside quotations you may also use commas instead of whitespaces to separate
+options.
+
+
++ LogFile Command
+
+Syntax:
+  LogFile <log filepath>
+
+The LogFile command specifies a filepath to be used as log file. If the -l
+option of the command line is used, it will overwrite the LogFile command. This
+command may be used only once. The best practice is to place LogFile as
+first command in the configuration.
+
+To prevent running several instances of mfreq-list writing the same
+filelist(s) at the same time the logfile will be locked.
+
+mfreq-list logs when it's started or ended. If you see a log entry that the
+program ended with errors, please run it manually and check the standard
+output for finding the cause of the error.
+
+
++ Exclude Command
+
+Syntax:
+  Exclude <name or pattern>
+
+To exclude specific files from being listed use the Exclude command and
+specify a name or a name pattern. A pattern supports following wildcards:
+  - ? for matching a single character
+  - * for matching any number of characters (including zero)
+
+Both wildcards may be used multiple times in a single pattern.
+
+Each Exclude command will add the given name or pattern to a list, which
+is consulted when the FileArea command is executed.
+
+
++ Filelist Command
+
+Syntax:
+  Filelist <filepath>
+
+The Filelist command starts a new filelist. If the given filepath already
+exists it will be overwritten. An old filelist will be closed.
+
+
++ AddText Command
+
+Syntax:
+  AddText <text>
+
+This command allows you to add some custom text to the current filelist. If
+the text includes any spaces enclose it with quotation marks, for example:
+  AddText "This is my custom text." 
+
+For an empty line use:
+  AddText ""
+
+
++ Define files.bbs Command
+
+Syntax:
+  Define files.bbs NameFormat <format> [NameWidth <width>]
+    [SizePos <pos> SizeFormat <format>]
+    [DatePos <pos> DateFormat <format>]
+    [CounterPos <pos> CounterFormat <format>]
+    DescPos <pos>
+
+The command above defines the format of the files.bbs description file. It
+tells mfreq-list which data fields are used. Each call will reset all settings
+of the last call.
+
+For all arguments the <pos> value is the position of the data field, starting
+with 1 for the first character (valid range: 1-120). A position of 40 means
+that the data field starts at character position 40.
+
+Arguments:
+
+  * NameFormat <format>
+  Defines file name format.
+
+  format  description
+  -----------------------------------------
+  DOS     8.3 DOS style
+  Long    full name (you need to set NameWidth too!)
+
+  * NameWidth <width>
+  Defines the maximum length of the filename. If <width> is exceeded, the
+  filename will be truncated with an asterisk ("*"). The valid range of
+  <width> is 12 up to 60. 
+
+  * SizePos <pos> SizeFormat <format>
+  Enables file size field. Defines start position and format.
+
+  format   description
+  -----------------------------------------
+  Bytes-8  number of bytes, max. 8 digits
+  Unit-8   bytes with unit, max. 8 digits/chars
+
+  The size field is right-justified! So take care when defining the position!
+
+  * DatePos <pos> DateFormat <format>
+  Enables file date field. Defines start position and format.
+
+  format    description
+  -----------------------------------------
+  US        MM-DD-YY
+  ISO       YYYY-MM-DD
+
+  * CounterPos <pos> CounterFormat <format>
+  Enables download counter field. Defines start position and format.
+
+  format    description
+  -----------------------------------------
+  Square-2  [nn]
+  Square-3  [nnn]  
+  Square-4  [nnnn]  
+
+  * DescPos <pos>
+  Sets start position of file description.
+
+
++ Define filelist Command
+
+Syntax:
+  Define filelist [NamePos <line-pos>] NameFormat <format> [NameWidth <width>] 
+    [SizePos <line-pos> SizeWidth <width> SizeFormat <format>]
+    [DatePos <line-pos> DateFormat <format>]
+    [CounterPos <line-pos> CounterFormat <format>]
+    DescPos <line-pos> DescWidth <width>
+
+This command defines the output format of the filelist. It's similar to the
+"Define files.bbs" command. To support multiline output some data field
+positions may have a line number included using following syntax:
+
+  <line>-<pos> or <line>.<pos>
+
+When omitting the line number, mfreq will assume the line number being 1. For
+example:
+
+  - 1.10 means position 10 in line 1
+  - 1-10 same as above
+  - 10   same as above
+  - 3-40 means position 40 in line 3 
+
+The maximum line number supported is 5. To add empty lines skip line numbers.
+If you set NamePos to 2-<pos> an empty line is added before the file name.
+
+  * [NamePos <line-pos>] NameFormat <format> [NameWidth <width>]
+  Position (range: 1 - 120), width (range: 12 - 60) and format of file name:
+
+  format  description
+  -----------------------------------------
+  DOS     8.3 DOS style
+  Long    full name (you need to set NameWidth too!)  
+
+  * SizePos <line-pos> SizeWith <width> SizeFormat <format>
+  Position (range: 1 - 120), width (range: 4 - 12) and format of file size:
+
+  format  description
+  -----------------------------------------
+  Bytes   number of bytes
+  Unit    bytes with unit
+
+  The size field is right-justified! So take care when defining the position!
+
+  * DatePos <line-pos> DateFormat <format>
+  Position (range: 1 - 120) and format of file date:
+
+  format    description
+  -----------------------------------------
+  US        MM-DD-YY
+  ISO       YYYY-MM-DD
+
+  * CounterPos <line-pos> CounterFormat <format>
+  Position (range: 1 - 120) and format of download counter:
+
+  format    description
+  -----------------------------------------
+  Square-2  [nn]
+  Square-3  [nnn]  
+  Square-4  [nnnn]
+
+  * DescPos <line-pos> DescWidth <width>
+    Position (range: 1 - 120) and width (range: 18-80) of description field.
+
+
++ InfoMode Command
+
+Syntax:
+  InfoMode [dir.bbs] [files.bbs] [Update] [Strict] [Skips]
+
+Switches:
+  - dir.bbs     enables use of dir.bbs/DIR.BBS
+  - files.bbs   enables use of files.bbs/FILES.BBS
+  - Update      enables update of file description file
+  - Strict      enables strict syntax checking
+  - Skips       allows missing data fields
+
+
+With InfoMode you set the source of file descriptions. When you enable
+files.bbs, you have to define it's format with the "Define files.bbs" command.
+
+If you want mfreq-list to update the description file, e.g. removing deleted
+files, set the Update switch.
+
+For strict syntax checking of the file description files set the Strict switch,
+i.e. all defined data fields must exist and their positions must match exactly.
+The Skips switch allows missing data fields (premature end of line).
+
+
++ Reset Command
+
+Syntax:
+  Reset [SetMode]
+
+As expected this command resetsseveral things back to their defaults:
+
+  Keyword        Action
+  -----------------------------------------------------
+  InfoMode       resets all InfoMode switches 
+  Excludes       clears the list of file excludes
+
+
++ FileArea Command
+
+Syntax:
+  FileArea <name> Path <path> [Info <description>]
+
+The FileArea command scans a directory and writes a sorted list of files to
+the current filelist. Specify the file echos name and path. The Info argument
+overrides any other source of the fileareas description.
+
+
+* ToDo / Feature Requests
+
+Some stuff which needs to be fixed or would be nice to have:
+  - Support special formatting of additional description lines in files.bbs?
+    ("<spaces>+ <desc>" / "<spaces>| <desc>")
+  - Support comment lines in files.bbs?
+    (" <comment>" / "--- <comment>")
+  - Support of descript.ion?
+  - Support file_id.diz? Try to extract?
+
+
+
+------------------------------------------------------------------------------
+
+                                   mfreq-srif
+
+------------------------------------------------------------------------------
+ 
+
+* About
+
+This is the SRIF frequest handler. It reads the mailers SRIF file, processes
+the file request while checking for any limits, writes a response list and
+creates a response netmail or textmail if configured. mfreq-srif requires an
+file index created by mfreq-index.
+
+
+* Usage
+
+The command line usage is:
+
+  mfreq-srif [-h/-?] [-c <cfg filepath>] [-l <log filepath>] -s <SRIF filepath>
+
+  -h/-?  prints usage information (optional)
+  -c     configuration filepath (optional)
+  -l     log filepath (optional)
+  -s     SRIF filepath (required)
+
+Whithout the -c option the default filepath "/etc/fido/mfreq/srif.cfg" will
+be used as configuration file. The -l option overrides the LogFile command of
+the configuration file. If neither the -l option nor the LogFile command are
+given, nothing will be logged.
+
+If you are running binkd you would add following to your binkd.cfg:
+
+  exec "/path-to/mfreq-srif -s *S" *.req
+
+For qico-xe please add following to qico.conf:
+
+  srifrp  /path-to/mfreq-srif -s
+
+
+* Hints
+
+Symbolic file links are not supported for file areas or magic files. They
+will be not followed.
+
+All FTS addresses (AKAs) will be normalized into following format:
+  <zone>:<net>/<node>.<point>[@<domain>]
+
+The <domain> part is optional. Nodes get 0 as point number.
+
+
+* Requests
+
+Requests with the following format are supported:
+  <filename pattern> [!<password>]
+
+Each line should contain a single filename or pattern with an optional
+password separated by a space. Due to internal token processing the
+password may also be separated by comma or whitespaces. A filename or pattern
+with spaces needs to be enclosed in quotation marks, e.g. "my file.lha".
+
+Wildcards:
+  - ? for matching a single character
+  - * for matching any number of characters (including zero)
+
+Both wildcards may be used multiple times in a pattern.
+
+
+* NetMail/TextMail
+
+The frequest handler creates a response netmail or textmail for the requestor
+and adds the netmail packet or textmail file to the response list (with the
+delete-me-after-sent indicator).
+
+A result textblock is generated for each requested file/pattern:
+
+  <empty line>
+  <file/pattern requested>
+     - <file found or other feedback>
+    [- <file found or other feedback>]
+
+The message is formatted like this:
+
+  [MailHeader]
+  <Result>
+  [Result]
+  ...
+  [Result]
+  [MailFooter]
+
+
+* Configuration
+
+It's a simple ASCII text file. For a quick setup you'll find an example
+configuration "srif.cfg" in the sample-cfg directory.
+
+
++ Basic Syntax
+
+Empty lines and lines starting with a "#" are treated as comments. Any other
+lines should contain a valid setting. Settings mostly got additional arguments
+and options. Arguments with spaces, like a filepath, should be enclosed in
+quotation marks, for example "/fido/my files".
+
+The command parser also supports following quoted special characters:
+  - \" for a literal "
+  - \\ for a literal \
+
+Outside quotations you may also use commas instead of whitespaces to separate
+options.
+
+
++ LogFile Setting
+
+Syntax:
+  LogFile <log filepath>
+
+The LogFile setting specifies a filepath to be used as log file. If the -l
+option of the command line is used, it will overwrite the LogFile command. This
+setting may be used only once. The best practice is to place LogFile as
+first setting in the configuration.
+
+mfreq-srif logs when it's started or ended. If you see a log entry that the
+program ended with errors, please run it manually within a test environment
+and check the standard output for finding the cause of the error. For the
+test environment simply create a pair of fake SRIF and request files. 
+
+
++ SetMode Setting
+
+Syntax:
+  SetMode [NetMail] [TextMail] [RemoveReq] [AnyCase] [BinarySearch]
+          [LogRequest]
+
+With SetMode you enable following features: 
+
+  Switch         Feature
+  ----------------------------------------
+  NetMail        send response netmail
+  TextMail       send response textmail (plain ASCII file)
+  RemoveReq      delete request file after processing
+  AnyCase        match file names case-insensitive
+  BinarySearch   enable binary filename search
+  LogRequest     log file requests in more detail
+
+Please set the RemoveReq switch if your mailer doesn't delete the request file
+after calling the frequest handler.
+
+If you've enabled the binary search feature for mfreq-index, enable it here
+too. This feature uses an additional index file to perform a binary search to
+speed up the processing of file requests.
+
+With LogRequest set mfreq-srif logs which files are requested and which are  
+going to be sent.
+
+
++ Address Setting
+
+Syntax:
+  Address <zone>:<net>/<node>[.<point>][@<domain>]
+
+This defines your FTS addresses (AKAs). At least you should set your main AKA.
+Add an Address setting for each AKA.
+
+
++ MailDir setting
+
+Syntax:
+  MailDir <path>
+
+This setting is optional and specifies the path for response netmails or
+textmails. A good choice would be your outbound directory or /tmp. Used only
+once in the configuration. If not set, the default path "/var/tmp" will be
+used.
+
+Example:
+ MailDir /tmp
+
+
++ MailHeader/MailFooter setting
+
+Syntax:
+  MailHeader <text>
+  MailFooter <text>
+
+Both settings allow you to add some custom text to the netmail or textmail
+response. MailHeader adds text at the top of the mail and MailFooter at the
+bottom. In between mfreq-srif will report any results of the request. The text
+is written to the mail in the same order as in the configuration.
+
+If the text includes any spaces enclose it with quotation marks, for example:
+  MailHeader "This is my custom text." 
+
+For an empty line use:
+  MailHeader ""
+
+Some message readers won't display empty lines at the beginning of a netmail.
+To circumvent that just add a space, like:
+  MailHeader " "
+  MailHeader "bla bla"
+
+
++ Limit Setting
+
+Syntax:
+  Limit <FTS address pattern> [Files <files>] [Bytes <bytes>]
+        [IfListed]
+
+This settings limits what a requester may retrieve. Actually it's a list of
+rules linked to a specfic FTS address pattern. The first matching rule will be
+used.
+
+The FTS address pattern is based on the normalized format (see hints)
+  <zone>:<net>/<node>.<point>[@<domain>]
+and supports following wildcards:
+  - ? for matching a single character
+  - * for matching any number of characters (including zero)
+
+Both wildcards may be used multiple times in a pattern.
+
+Some examples:
+
+  pattern          matches
+  -----------------------------------------------------------
+  ?:*              any system in a zone with one digit
+  2:*              any system in zone 2
+  2:244/*          any system in zone 2 and net 244
+  *@fidonet        any system in domain fidonet
+  *                any system (for a rule of last resort)
+
+The Files argument limits the number of files which may be requested. And
+the Bytes argument defines the maximum number of bytes allowed. Both values
+should be in the range of 0 to 2147483000 (2^31 - 1). Zero means "none". 
+
+For the byte value you may use following units:
+  - kB for kilo Bytes (kiB)
+  - MB for Mega Bytes (MiB)
+  - GB for Giga Bytes (GiB)
+
+Place the unit directly behind the value or enclose the term in quotation
+marks if you insert a space:
+  - 10MB
+  - "10 MB" 
+
+A rule like
+  Limit 1:2/3.4 Files 0
+would deny any files for the given system.
+
+With the IfListed switch set the rule is only used if the node is listed
+in a nodelist. That information is provided by the mailer via the SRIF file.
+
+If you define any rules it's strongly recommended to define also a rule of
+last resort, like
+  Limit * Files 10 Bytes 2MB
+
+The following defaults are used if no limit is given at all:
+  - 20 files
+  - 2000000 bytes
+
+
++ Index Setting
+
+Syntax:
+  Index <filepath>
+
+The Index setting adds a file index to be used for file searching. You may
+add several file indexes if you like.
+
+The <filepath> argument will be expanded to a pair of files:
+  - <filepath>.data
+  - <filepath>.lookup
+
+
+* ToDo / Feature Requests
+
+Some stuff which needs to be fixed or would be nice to have:
+  - Support of removable media (Index option: [IfMounted <path>])
+    by checking /proc/mount?
+  - Support Time setting in SRIF file?
+  - Support packet header based on FSC-0039?
+
+
+
+------------------------------------------------------------------------------
+                                  misc stuff
+------------------------------------------------------------------------------
+
+
+* Log Files
+
+Format of entries in the log file:
+<MMM> <DD> <HH>:<MM>:<SS> <YYYY> [<PID>] <message>
+
+
+* Contact the Author
+
+  EMail:     madires@theca-tabellaria.de
+  Netmail:   Markus Reschke 2:244/1661
+
+
+* Credits
+
+A big thank you to:
+
+  Paul Quinn, 3:640/384, for beta-testing and some great feature suggestions.
+
+
+
+------------------------------------ EOF -------------------------------------
+
+
+
