@@ -1,5 +1,5 @@
 Source: mfreq
-Section: unknown
+Section: utils
 Priority: extra
 Maintainer: Robert James Clay <jame@rocasa.us>
 Build-Depends: debhelper (>= 8.0.0)
@@ -11,5 +11,16 @@ Homepage: <insert the upstream URL, if relevant>
 Package: mfreq
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: <insert up to 60 chars description>
- <insert long description, indented with spaces>
+Description: suite of tools for FTN style file requesting
+ MFreq consists of a file index generator, filelist generator and an SRIF
+ compatible Fidonet Technology Network (FTN) file request handler.
+
+Package: mfreq-dbg
+Architecture: any
+Section: debug
+Depends: mfreq (= ${binary:Version}), ${misc:Depends}
+Description: debugging symbols for mfreq
+ MFreq consists of a file index generator, filelist generator and an SRIF
+ compatiblee Fidonet Technology Network (FTN) file request handler.
+ .
+ This package contains the debugging symbols for mfreq.
