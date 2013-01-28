@@ -1,0 +1,43 @@
+.\"                                      Hey, EMACS: -*- nroff -*-
+.\" (C) Copyright 2013 Robert James Clay <jame@rocasa.us>,
+.\"
+.\" First parameter, NAME, should be all caps
+.\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
+.\" other parameters are allowed: see man(7), man(1)
+.TH MFREQ 1 "January 28, 2013"
+.\" Please adjust this date whenever revising the manpage.
+.\"
+.\" Some roff macros, for reference:
+.\" .nh        disable hyphenation
+.\" .hy        enable hyphenation
+.\" .ad l      left justify
+.\" .ad b      justify to both left and right margins
+.\" .nf        disable filling
+.\" .fi        enable filling
+.\" .br        insert line break
+.\" .sp <n>    insert n+1 empty lines
+.\" for manpage-specific macros, see man(7)
+.SH NAME
+MFreq \- Suite of tools for FTN style file requesting
+.SH SYNOPSIS
+.B mfreq- index
+.RI [\-h/\-?] [\-c <cfg filepath>] [\-l <log filepath>]
+.br
+.B mfreq-list
+.RI [\-h/\-?] [\-c <cfg filepath>] [\-l <log filepath>]
+.br
+.B mfreq-srif
+.RI [\-h/\-?] [\-c <cfg filepath>] [\-l <log filepath>] \-s <SRIF filepath>
+.SH DESCRIPTION
+The 
+.B MFreq
+suite of tools consists of a file index generator, filelist generator
+and an SRIF compatible file request handler. The original version of mfreq
+was developed for the venerable Commodore Amiga (tm) back in the 1990s.
+.PP
+For a complete description, see their specific man pages.
+.SH SEE ALSO
+.BR mfreq-index (1),
+.BR mfreq-list (1),
+.BR mfreq-srif (1).
+.br
