@@ -6,6 +6,16 @@
 
 ------------------------------------------------------------------------------
 
+* 2013-02 / Version 3.06
+
+mfreq-index:
+  - Automatic filepaths were created for AutoMagics by mistake, causing "file
+    not available" messages by the request processor. Changed program logic to
+    generate correct filepath.
+  - Corrected mixed up destination and origin AKAs in the INTL kludge of the
+    response netmail.
+
+
 * 2013-01 / Version 3.05
 
 mfreq-index:
