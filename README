@@ -602,6 +602,7 @@ Some stuff which needs to be fixed or would be nice to have:
     (" <comment>" / "--- <comment>")
   - Support of descript.ion?
   - Support file_id.diz? Try to extract?
+  - Add switch for case-insensitive filenames in files.bbs.
 
 
 

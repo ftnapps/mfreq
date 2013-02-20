@@ -36,7 +36,7 @@
 
 /* about */
 #define PROJECT          "mfreq"
-#define VERSION          "v3.05"
+#define VERSION          "v3.06"
 #define COPYRIGHT        "(c) 1994-2013 by Markus Reschke"
 
 /* buffers (must not exceed maximum size of an Integer */
