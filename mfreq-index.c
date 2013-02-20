@@ -455,11 +455,12 @@ _Bool ProcessPath(char *Path, char *PW, int Depth, _Bool AutoMagic)
   DIR                    *Directory;
   struct dirent          *File;
   struct stat            FileData;
-  char                   *LocalPath = NULL;
-  char                   *SubPath = NULL;
+  char                   *LocalPath = NULL;   /* absolute path */
+  char                   *SubPath = NULL;     /* path of sub-directory */
   char                   *Help, *LastDot;
-  unsigned int           AliasNumber = 0;
-  off_t                  AliasOffset = -1;
+  size_t                 Length;
+  unsigned int           AliasNumber = 0;     /* alias counter */
+  off_t                  AliasOffset = -1;    /* alias file offset */
 
   /* sanity check */
   if ((Path == NULL) || (Depth < 0)) return Flag;
@@ -561,21 +562,27 @@ _Bool ProcessPath(char *Path, char *PW, int Depth, _Bool AutoMagic)
               Flag = AddDataElement(TempBuffer2, TempBuffer, PW);
               if (Flag) Env->Files++;       /* increase file counter */
 
-              if (AutoMagic)         /* auto magic */
+              if (AutoMagic)         /* auto magic enabled */
               {
                 /* find last "." in filename */
                 Help = TempBuffer2;
                 LastDot = NULL;
-                while (Help[0] != 0)          /* scan string */
+                while (Help[0] != 0)         /* scan string */
                 {
                   if (Help[0] == '.') LastDot = Help;
-                  Help++;                     /* next char */
+                  Help++;                    /* next char */
                 }
 
                 /* create magic */
-                if (LastDot)                  /* got extension */
+                if (LastDot)                 /* got extension */
                 {
-                  LastDot[0] = 0;               /* end string */
+                  /* add filename to path */
+                  Length = strlen(TempBuffer);
+                  Help = &TempBuffer[Length];    /* pointer to end of string */
+                  snprintf(Help, DEFAULT_BUFFER_SIZE - 1 - Length,
+                    "%s", TempBuffer2);
+
+                  LastDot[0] = 0;            /* create sub-string */
                   Flag = AddDataElement(TempBuffer2, TempBuffer, PW); 
                 }
               }

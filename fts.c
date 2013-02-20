@@ -675,12 +675,12 @@ _Bool WriteNetmailKludges(FILE *File)
 
   snprintf(Buffer, 50,
     "\001INTL %u:%u/%u %u:%u/%u\r\n",
-     Env->ActiveLocalAKA->Zone,
-     Env->ActiveLocalAKA->Net,
-     Env->ActiveLocalAKA->Node, 
      Env->ActiveRemoteAKA->Zone,
      Env->ActiveRemoteAKA->Net,
-     Env->ActiveRemoteAKA->Node);
+     Env->ActiveRemoteAKA->Node, 
+     Env->ActiveLocalAKA->Zone,
+     Env->ActiveLocalAKA->Net,
+     Env->ActiveLocalAKA->Node);
   Size += strlen(Buffer);
   Buffer = &(OutBuffer[Size]);
 
