@@ -16,8 +16,7 @@
 
 /* defaults for this program */
 #define NAME            "mfreq-srif"
-#define DEFAULT_CFG     "/etc/fido/mfreq/srif.cfg"
-#define DEFAULT_TMP     "/var/tmp"
+#define CFG_FILENAME    "srif.cfg"
 
 
 /*
@@ -38,6 +37,24 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <dirent.h>
+
+
+/*
+ *  more local constants
+ */
+
+/* update configuration path */
+#ifndef CFG_PATH
+  #define CFG_PATH       DEFAULT_CFG_PATH
+#endif
+
+/* build configuration filepath */
+#define CFG_FILEPATH     CFG_PATH"/"CFG_FILENAME
+
+/* update tmp path */
+#ifndef TMP_PATH
+  #define TMP_PATH       DEFAULT_TMP_PATH
+#endif
 
 
 /*
@@ -1954,7 +1971,7 @@ _Bool CheckSRIF()
  *  - 0 on error
  */
 
-_Bool Add_Limit(Token_Type *TokenList, unsigned int Line)
+_Bool Add_Limit(Token_Type *TokenList)
 {
   _Bool             Flag = False;            /* return value */
   _Bool             Run = True;              /* control flag */
@@ -2023,7 +2040,7 @@ _Bool Add_Limit(Token_Type *TokenList, unsigned int Line)
   if ((Run == False) || (Keyword > 0) || (AddressToken == NULL))
   {
     Run = False;
-    Log(L_WARN, "Syntax error in cfg file, line %d!", Line);
+    LogCfgError();
   }
 
 
@@ -2051,7 +2068,7 @@ _Bool Add_Limit(Token_Type *TokenList, unsigned int Line)
  *  - 0 on error
  */
 
-_Bool Add_MailText(Token_Type *TokenList, unsigned int Line)
+_Bool Add_MailText(Token_Type *TokenList)
 {
   _Bool             Flag = False;       /* return value */
   _Bool             Run = True;         /* control flag */
@@ -2107,7 +2124,7 @@ _Bool Add_MailText(Token_Type *TokenList, unsigned int Line)
   if ((Run == False) || (Get > 0) || (TextToken == NULL))
   {
     Run = False;
-    Log(L_WARN, "Syntax error in cfg file, line %d!", Line);
+    LogCfgError();
   }
 
 
@@ -2154,7 +2171,7 @@ _Bool Add_MailText(Token_Type *TokenList, unsigned int Line)
  *  - 0 on error
  */
 
-_Bool Set_MailPath(Token_Type *TokenList, unsigned int Line)
+_Bool Set_MailPath(Token_Type *TokenList)
 {
   _Bool             Flag = False;       /* return value */
   _Bool             Run = True;         /* control flag */
@@ -2202,7 +2219,7 @@ _Bool Set_MailPath(Token_Type *TokenList, unsigned int Line)
   if ((Run == False) || (Get > 0) || (PathToken == NULL))
   {
     Run = False;
-    Log(L_WARN, "Syntax error in cfg file, line %d!", Line);
+    LogCfgError();
   }
 
 
@@ -2231,7 +2248,7 @@ _Bool Set_MailPath(Token_Type *TokenList, unsigned int Line)
  *  - 0 on error
  */
 
-_Bool Add_Index(Token_Type *TokenList, unsigned int Line)
+_Bool Add_Index(Token_Type *TokenList)
 {
   _Bool             Flag = False;       /* return value */
   _Bool             Run = True;         /* control flag */
@@ -2273,7 +2290,7 @@ _Bool Add_Index(Token_Type *TokenList, unsigned int Line)
   if ((Run == False) || (Get > 0) || (FilepathToken == NULL))
   {
     Run = False;
-    Log(L_WARN, "Syntax error in cfg file, line %d!", Line);
+    LogCfgError();
   }
 
 
@@ -2300,7 +2317,7 @@ _Bool Add_Index(Token_Type *TokenList, unsigned int Line)
  *  - 1 on success
  *  - 0 on error
  */
-_Bool Add_AKA(Token_Type *TokenList, unsigned int Line)
+_Bool Add_AKA(Token_Type *TokenList)
 {
   _Bool             Flag = False;       /* return value */
   _Bool             Run = True;         /* control flag */
@@ -2343,7 +2360,7 @@ _Bool Add_AKA(Token_Type *TokenList, unsigned int Line)
   if ((Run == False) || (Get > 0) || (AddressToken == NULL))
   {
     Run = False;
-    Log(L_WARN, "Syntax error in cfg file, line %d!", Line);
+    LogCfgError();
   }
 
 
@@ -2379,7 +2396,7 @@ _Bool Add_AKA(Token_Type *TokenList, unsigned int Line)
  *  - 0 on error
  */
 
-_Bool Set_Mode(Token_Type *TokenList, unsigned int Line)
+_Bool Set_Mode(Token_Type *TokenList)
 {
   _Bool                  Flag = False;       /* return value */
   _Bool                  Run = True;         /* control flag */
@@ -2445,7 +2462,7 @@ _Bool Set_Mode(Token_Type *TokenList, unsigned int Line)
 
   if (Run == False)
   {
-    Log(L_WARN, "Syntax error in cfg file, line %d!", Line);
+    LogCfgError();
   }
   else
   {
@@ -2466,7 +2483,7 @@ _Bool Set_Mode(Token_Type *TokenList, unsigned int Line)
  *  - 0 on error
  */
 
-_Bool Set_LogFile(Token_Type *TokenList, unsigned int Line)
+_Bool Set_LogFile(Token_Type *TokenList)
 {
   _Bool             Flag = False;       /* return value */
   _Bool             Run = True;         /* control flag */
@@ -2516,7 +2533,7 @@ _Bool Set_LogFile(Token_Type *TokenList, unsigned int Line)
   if ((Run == False) || (Get > 0) || (FilepathToken == NULL))
   {
     Run = False;
-    Log(L_WARN, "Syntax error in cfg file, line %d!", Line);
+    LogCfgError();
   }
 
 
@@ -2549,7 +2566,7 @@ _Bool Set_LogFile(Token_Type *TokenList, unsigned int Line)
  *  - 0 on error
  */
 
-_Bool ParseConfig(Token_Type *TokenList, unsigned int Line)
+_Bool ParseConfig(Token_Type *TokenList)
 {
   _Bool                  Flag = False;       /* return value */
   unsigned short         Keyword = 0;        /* keyword ID */
@@ -2568,40 +2585,40 @@ _Bool ParseConfig(Token_Type *TokenList, unsigned int Line)
     switch (Keyword)           /* setting keywords */
     {
       case 0:       /* unknown command */
-        Log(L_WARN, "Unknown setting in cfg file line %d (%s)!",
-          Line, TokenList->String);        
+        Log(L_WARN, "Unknown setting in cfg file (%s), line %d (%s)!",
+          Env->CfgInUse, Env->CfgLinenumber, TokenList->String);        
         break;
 
       case 1:       /* logfile */
-        Flag = Set_LogFile(TokenList, Line);
+        Flag = Set_LogFile(TokenList);
         break;
 
       case 2:       /* set mode */
-        Flag = Set_Mode(TokenList, Line);
+        Flag = Set_Mode(TokenList);
         break;
 
       case 3:       /* address */
-        Flag = Add_AKA(TokenList, Line);
+        Flag = Add_AKA(TokenList);
         break;
 
       case 4:       /* index */
-        Flag = Add_Index(TokenList, Line);
+        Flag = Add_Index(TokenList);
         break;
 
       case 5:       /* maildir */
-        Flag = Set_MailPath(TokenList, Line);
+        Flag = Set_MailPath(TokenList);
         break;
 
       case 6:       /* mail header */
-        Flag = Add_MailText(TokenList, Line);
+        Flag = Add_MailText(TokenList);
         break;
 
       case 7:       /* mail footer */
-        Flag = Add_MailText(TokenList, Line);
+        Flag = Add_MailText(TokenList);
         break;
 
       case 8:       /* limit */
-        Flag = Add_Limit(TokenList, Line);
+        Flag = Add_Limit(TokenList);
     }
   }
 
@@ -2618,7 +2635,7 @@ _Bool ParseConfig(Token_Type *TokenList, unsigned int Line)
  *  - 0 on error
  */
 
-_Bool ReadConfig()
+_Bool ReadConfig(char *Filepath)
 {
   _Bool                  Flag = False;        /* return value */
   _Bool                  Run = True;          /* loop control */
@@ -2627,10 +2644,20 @@ _Bool ReadConfig()
   char                   *HelpStr;
   Token_Type             *TokenList;
   unsigned int           Line = 0;            /* line number */
+  unsigned int           OldLine;            /* old linenumber */
+  char                   *OldCfg;            /* old filepath */
 
-  File = fopen(Env->CfgFilepath, "r");         /* read mode */
+  /* sanity check */
+  if (Filepath == NULL) return Flag;
+
+  File = fopen(Filepath, "r");                /* read mode */
   if (File)
   {
+    /* setup data for logging */
+    OldCfg = Env->CfgInUse;        /* save old cfg filepath */
+    Env->CfgInUse = Filepath;      /* update cfg filepath */
+    OldLine = Env->CfgLinenumber;  /* save old linenumber */
+
     while (Run)
     {
       /* read line-wise */
@@ -2649,7 +2676,7 @@ _Bool ReadConfig()
           if (InBuffer[Length - 1] != 10)             /* pre-last char is not LF */
           {
             Run = False;                         /* end loop */
-            Log(L_WARN, "Input overflow for cfg file!");
+            Log(L_WARN, "Input overflow for line %d in cfg file (%s)!", ++Line, Filepath);
           }
         }
 
@@ -2675,7 +2702,7 @@ _Bool ReadConfig()
 
             if (TokenList)
             {
-              Flag = ParseConfig(TokenList, Line);
+              Flag = ParseConfig(TokenList);
               if (Flag == False) Run = False;        /* end loop on error */
               FreeTokenlist(TokenList);              /* free linked list */
             }
@@ -2688,11 +2715,14 @@ _Bool ReadConfig()
       }
     }
 
-    fclose(File);           /* close file */
+    /* clean up */
+    fclose(File);                  /* close file */
+    Env->CfgInUse = OldCfg;        /* restore old cfg filepath */
+    Env->CfgLinenumber = OldLine;  /* restore old linenumber */
   }
   else
   {
-    Log(L_WARN, "Couldn't open configuration file (%s)!", Env->CfgFilepath);
+    Log(L_WARN, "Couldn't open cfg file (%s)!", Filepath);
   }
 
   return Flag;
@@ -2726,7 +2756,7 @@ _Bool CheckConfig()
     /* set default path for MailDir if not set by cfg */
     if (Env->MailPath == NULL)
     {
-      Env->MailPath = CopyString(DEFAULT_TMP);
+      Env->MailPath = CopyString(TMP_PATH);
     }
 
     /* create default limit if none set by cfg */
@@ -2867,7 +2897,7 @@ _Bool ParseCommandLine(int argc, char *argv[])
     /* set default config filepath */
     if (Env->CfgFilepath == NULL)
     {
-      Env->CfgFilepath = CopyString(DEFAULT_CFG);
+      Env->CfgFilepath = CopyString(CFG_FILEPATH);
     }
   }
  
@@ -2980,6 +3010,8 @@ _Bool GetAllocations(void)
 
     /* environment: program control */
     Env->Run = True;
+    Env->CfgInUse = NULL;
+    Env->CfgLinenumber = 0;
 
     /* environment: common configuration */
     Env->CfgSwitches = SW_NONE;
@@ -3160,7 +3192,7 @@ int main(int argc, char *argv[])
   {
     Flag = False;                       /* reset flag */
 
-    if (ReadConfig())                   /* read config */
+    if (ReadConfig(Env->CfgFilepath))   /* read config */
     {
       if (CheckConfig())                /* check cfg for required stuff */
       {

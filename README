@@ -227,6 +227,29 @@ extension dropped off. For example:
   - myfile.zip -> myfile  
 
 
++ SharedFileArea Command
+
+Syntax:
+  SharedFileArea Path <path> [PW <password>] [Depth <levels>] [AutoMagic]
+    [switches and options from mfreq-list]
+
+This is basically the same command like FileArea, but with a slightly
+changed syntax to share the command with mfreq-list. The mfreq-list specific
+switches and options are ignored. The idea is that you may put all your
+fileareas into an additional configuration file and share it by the Include
+command with mfreq-list.
+
+
++ Include Command
+
+Syntax:
+  Include [Config <filepath>]
+
+If you like to spread your configuration over several files you may include
+those additional files with the Include command. Nesting is limited to 2
+levels (main configuration is the first level).
+
+
 + Index Command
 
 Syntax:
@@ -583,6 +606,16 @@ As expected this command resetsseveral things back to their defaults:
   Excludes       clears the list of file excludes
 
 
++ Include Command
+
+Syntax:
+  Include [Config <filepath>]
+
+If you like to spread your configuration over several files you may include
+those additional files with the Include command. Nesting is limited to 2
+levels (main configuration is the first level).
+
+
 + FileArea Command
 
 Syntax:
@@ -591,6 +624,19 @@ Syntax:
 The FileArea command scans a directory and writes a sorted list of files to
 the current filelist. Specify the file echos name and path. The Info argument
 overrides any other source of the fileareas description.
+
+
++ SharedFileArea Command
+
+Syntax:
+  SharedFileArea Name <name> Path <path> [Info <description>]
+    [switches and options from mfreq-index]
+
+This is basically the same command like FileArea, but with a slightly
+changed syntax to share the command with mfreq-index. The mfreq-index specific
+switches and options are ignored. The idea is that you may put all your
+fileareas into an additional configuration file and share it by the Include
+command with mfreq-index.
 
 
 * ToDo / Feature Requests

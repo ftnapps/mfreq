@@ -6,6 +6,21 @@
 
 ------------------------------------------------------------------------------
 
+* 2012-02 / Version 3.07
+
+all:
+  - Changed setup of configuration path and temp path to support global
+    defaults. Enable and change CFG_PATH and TMP_PATH in the Makefile to
+    override internal defaults!
+  - Streamlined logging for configuration errors.
+
+mfreq-index & mfreq-list:
+  - Added a new command to include additional configuration files (Include
+    Config).
+  - Added a shared FileArea command (SharedFileArea) to allow usage of a
+    single fileecho configuration file by both tools.
+
+
 * 2013-02 / Version 3.06
 
 mfreq-index:
