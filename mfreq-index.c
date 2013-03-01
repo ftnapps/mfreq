@@ -459,7 +459,8 @@ _Bool ProcessMagicPath(char *Path)
 
 
 /*
- *  get files from directory
+ *  get files from a directory and add them to the fileindex
+ *  - supports recursive directory processing
  *
  *  returns:
  *  - 1 on success
@@ -468,18 +469,18 @@ _Bool ProcessMagicPath(char *Path)
 
 _Bool ProcessPath(char *Path, char *PW, int Depth, _Bool AutoMagic)
 {
-  _Bool                  Flag = False;        /* return value */
-  _Bool                  Run = True;          /* control flag */
-  _Bool                  AliasFlag = False;   /* flag for path aliases */
+  _Bool                  Flag = False;       /* return value */
+  _Bool                  Run = True;         /* control flag */
+  _Bool                  AliasFlag = False;  /* flag for path aliases */
   DIR                    *Directory;
   struct dirent          *File;
   struct stat            FileData;
-  char                   *LocalPath = NULL;   /* absolute path */
-  char                   *SubPath = NULL;     /* path of sub-directory */
+  char                   *LocalPath = NULL;  /* absolute path */
+  char                   *SubPath = NULL;    /* path of sub-directory */
   char                   *Help, *LastDot;
   size_t                 Length;
-  unsigned int           AliasNumber = 0;     /* alias counter */
-  off_t                  AliasOffset = -1;    /* alias file offset */
+  unsigned int           AliasNumber = 0;    /* alias counter */
+  off_t                  AliasOffset = -1;   /* alias file offset */
 
   /* sanity check */
   if ((Path == NULL) || (Depth < 0)) return Flag;
@@ -649,6 +650,93 @@ _Bool ProcessPath(char *Path, char *PW, int Depth, _Bool AutoMagic)
   if (LocalPath) free(LocalPath);
 
   return Flag;
+}
+
+
+
+/*
+ *  get files from a directory and add them to global filelist
+ *
+ *  returns:
+ *  - 1 on success
+ *  - 0 on error
+ */
+
+_Bool ScanPath(char *Path, char *Pattern)
+{
+  _Bool                  Flag = False;        /* return value */
+  _Bool                  Run = True;          /* loop control flag */
+  _Bool                  Add;                 /* data control flag */
+  DIR                    *Directory;
+  struct dirent          *File;
+  struct stat            FileData;
+
+  /* sanity check */
+  if (Path == NULL) return Flag;
+
+  Directory = opendir(Path);    /* open directory */
+
+  if (Directory != NULL)        /* dir opened */
+  {
+    if (chdir(Path) != 0)       /* change current directory to path */ 
+    {                           /* to simplify lstat later */ 
+      Run = False;
+    }
+
+    Flag = Run;                 /* update flag */
+
+
+    /*
+     *  get all directory entries and process each one
+     */
+
+    while (Run)
+    {
+      File = readdir(Directory);     /* get next file */
+
+      if (File)                      /* got it */
+      {
+        /* copy file name (File isn't re-entrant) */
+        snprintf(TempBuffer2, DEFAULT_BUFFER_SIZE - 1, "%s", File->d_name);
+
+        /* get file details */
+        if (lstat(TempBuffer2, &FileData) == 0)
+        {
+          /* only process regular files */
+          if (S_ISREG(FileData.st_mode))        /* regular file */
+          {
+            /* if name is not excluded */
+            if (! MatchExcludeList(TempBuffer2))
+            {
+              Add = True;               /* add file by default */
+
+              /* check if name matches pattern  */
+              if (Pattern && !MatchPattern(TempBuffer2, Pattern)) Add = False;
+
+              if (Add)                  /* add file to list */
+              {
+                Run = AddFileElement(TempBuffer2, FileData.st_mtime);
+                Flag = Run;             /* update flag */
+              }
+            }
+          }
+        }
+      }
+      else                           /* error or no more entries */
+      {
+        Run = False;                   /* end loop */
+      }
+    }
+
+    chdir(Env->CWD);            /* change current directory back */
+    closedir(Directory);        /* close directory */
+  }
+  else                          /* error */
+  {
+    Log(L_WARN, "Can't access directory (%s)!", Path);
+  }
+
+  return Flag;  
 }
 
 
@@ -1446,6 +1534,211 @@ _Bool Cmd_MagicPath(Token_Type *TokenList)
 
 
 /*
+ *  add smart magic to files
+ *  Syntax: SmartMagic <name> Path <path> [Pattern <pattern>] [Latest]
+ *          [PW <password>]
+ *
+ *  returns:
+ *  - 1 on success
+ *  - 0 on error
+ */
+
+_Bool Cmd_SmartMagic(Token_Type *TokenList)
+{
+  _Bool             Flag = False;       /* return value */
+  _Bool             Run = True;         /* control flag */
+  unsigned short    Keyword = 0;        /* keyword ID */
+  char              *Name = NULL;       /* magic name */
+  char              *Path = NULL;       /* path name */
+  char              *Pattern = NULL;    /* filename pattern */
+  char              *Password = NULL;   /* password for magic */
+  char              *LocalPath = NULL;  /* absolute path */
+  _Bool             Latest = False;     /* switch for latest file */
+  File_Type         *File;
+  File_Type         *Next;
+  time_t            Time;               /* time (seconds)*/
+  static char       *Keywords[6] =
+    {"SmartMagic", "Path", "Pattern", "Latest", "PW", NULL};
+
+  /* sanity check */
+  if (TokenList == NULL) return Flag;
+
+
+  /*
+   *  parse tokens
+   */
+
+  while (Run && TokenList && TokenList->String)
+  {
+    if (Keyword > 0)          /* get value */
+    {
+      switch (Keyword)
+      {
+        case 1:     /* name */
+          Name = TokenList->String;
+          break;
+      
+        case 2:     /* path */
+          Path = TokenList->String;
+          break;
+
+        case 3:     /* pattern */
+          Pattern = TokenList->String;
+          break;
+
+        case 5:     /* password */
+          Password = TokenList->String;
+      }
+
+      Keyword = 0;            /* reset */
+    }
+    else                      /* get keyword */
+    {
+      Keyword = GetKeyword(Keywords, TokenList->String);
+
+      switch (Keyword)        /* keywords without data */
+      {
+        case 0:          /* unknown keyword */
+          Run = False;
+          break;
+
+        case 4:          /* latest */
+          Latest = True;
+          Keyword = 0;        /* reset keyword */
+      }
+    }
+
+    TokenList = TokenList->Next;     /* goto to next token */
+  }
+
+
+  /*
+   *  check parser results
+   */
+
+  if ((Run == False) || (Keyword > 0) || (Name == NULL) || (Path == NULL) ||
+      ((Pattern == NULL) && (Latest == False)))
+  {
+    Run = False;
+    LogCfgError();
+  }
+
+
+  /*
+   *  process directory
+   */
+
+  if (Run)
+  {
+    Run = False;                   /* reset flag */
+
+    /* build absolute path if necessary */
+    if (Path[0] != '/')      /* relative path */
+    {
+      snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
+        "%s/%s", Env->CWD, Path);
+      LocalPath = CopyString(TempBuffer);
+      Path = LocalPath;
+    }
+
+    /* scan directory (considering excludes and pattern) */
+    if (ScanPath(Path, Pattern))
+    {
+      if (Env->FileList)           /* got some files */
+      {
+        Run = True;                /* ok to proceed */
+      }
+      else                         /* no matching files */
+      {
+        Flag = True;               /* job done */
+      }
+    }
+  }
+
+
+  /*
+   *  process filedate
+   */
+
+  if (Run && Latest)               /* select latest file */
+  {
+    Time = 0;                      /* start with 0 */
+
+    /* find latest time */
+    File = Env->FileList;          /* start of list */
+
+    while (File)                   /* follow list */
+    {
+      if (File->Time > Time)       /* newer */
+      {
+        Time = File->Time;              /* update time */
+      }
+
+      File = File->Next;           /* next element */
+    }
+
+    /* mark all older files */
+    File = Env->FileList;          /* start of list */
+
+    while (File)                   /* follow list */
+    {
+      if (File->Time < Time)       /* older */
+      {
+        File->Flags |= FILE_SKIP;       /* mark file */
+      }
+
+      File = File->Next;           /* next element */
+    }
+  }
+
+
+  /*
+   *  process matching files
+   */
+
+  if (Run)
+  {
+    File = Env->FileList;          /* start of list */
+
+    while (File)                   /* follow list */
+    {
+      Next = File->Next;           /* get next element */
+
+      /* add match to global index */
+      if (!(File->Flags & FILE_SKIP))
+      {
+        /* create full path */
+        snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
+          "%s/%s", Path, File->Name);
+        Flag = AddDataElement(Name, TempBuffer, Password);
+        if (Flag) Env->Files++;       /* increase file counter */
+        else Next = NULL;             /* end loop */
+      }
+
+      File = Next;                 /* next element */
+    }
+  }
+
+
+  /*
+   *  clean up
+   */
+
+  if (Env->FileList)               /* global file list */
+  {
+    FreeFileList(Env->FileList);   /* free list */
+    Env->FileList = NULL;          /* reset global variables */
+    Env->LastFile = NULL;
+  }
+
+  if (LocalPath) free(LocalPath);  /* local path */
+
+  return Flag;
+}
+
+
+
+/*
  *  add magic to files
  *  Syntax: Magic <name> File <filepath> [PW <password>]
  *
@@ -1459,10 +1752,9 @@ _Bool Cmd_Magic(Token_Type *TokenList)
   _Bool             Flag = False;       /* return value */
   _Bool             Run = True;         /* control flag */
   unsigned short    Keyword = 0;        /* keyword ID */
-  char              *Name = NULL;
-  char              *Filepath = NULL;
-  char              *Password = NULL;
-
+  char              *Name = NULL;       /* magic name */
+  char              *Filepath = NULL;   /* filepath */
+  char              *Password = NULL;   /* password for magic */
   static char       *Keywords[4] =
     {"Magic", "File", "PW", NULL};
 
@@ -1776,9 +2068,10 @@ _Bool ParseConfig(Token_Type *TokenList)
 {
   _Bool                  Flag = False;       /* return value */
   unsigned short         Keyword = 0;        /* keyword ID */
-  static char            *Keywords[11] =
-    {"LogFile", "SetMode", "Reset", "Magic", "MagicPath",
-     "Exclude", "FileArea", "Index", "Include", "SharedFileArea", NULL};
+  static char            *Keywords[12] =
+    {"FileArea", "SharedFileArea", "Magic", "SmartMagic", "MagicPath",
+     "Exclude", "Include", "SetMode", "Reset", "LogFile",
+     "Index", NULL};
 
   /* sanity check */
   if (TokenList == NULL) return Flag;
@@ -1795,23 +2088,23 @@ _Bool ParseConfig(Token_Type *TokenList)
           Env->CfgInUse, Env->CfgLinenumber, TokenList->String);        
         break;
 
-      case 1:       /* logfile */
-        Flag = Cmd_LogFile(TokenList);
+      case 1:       /* filearea */
+        Flag = Cmd_FileArea(TokenList);
         break;
 
-      case 2:       /* set mode */
-        Flag = Cmd_SetMode(TokenList);
+      case 2:       /* shared filearea */
+        Flag = Cmd_SharedFileArea(TokenList);
         break;
 
-      case 3:       /* reset */
-        Flag = Cmd_Reset(TokenList);
-        break;
-
-      case 4:       /* magic */
+      case 3:       /* magic */
         Flag = Cmd_Magic(TokenList);
         break;
 
-      case 5:       /* magicpatch */
+      case 4:       /* smart magic */
+        Flag = Cmd_SmartMagic(TokenList);
+        break;
+
+      case 5:       /* magicpath */
         Flag = Cmd_MagicPath(TokenList);
         break;
 
@@ -1819,20 +2112,25 @@ _Bool ParseConfig(Token_Type *TokenList)
         Flag = Cmd_Exclude(TokenList);
         break;
 
-      case 7:       /* filearea */
-        Flag = Cmd_FileArea(TokenList);
-        break;
-
-      case 8:       /* index */
-        Flag = Cmd_Index(TokenList);
-        break;
-
-      case 9:       /* include */
+      case 7:       /* include */
         Flag = Cmd_Include(TokenList);
         break;
 
-      case 10:       /* shared filearea */
-        Flag = Cmd_SharedFileArea(TokenList);
+      case 8:       /* set mode */
+        Flag = Cmd_SetMode(TokenList);
+        break;
+
+      case 9:       /* reset */
+        Flag = Cmd_Reset(TokenList);
+        break;
+
+      case 10:       /* logfile */
+        Flag = Cmd_LogFile(TokenList);
+        break;
+
+      case 11:      /* index */
+        Flag = Cmd_Index(TokenList);
+        break;
     }
   }
 
@@ -2172,6 +2470,8 @@ _Bool GetAllocations(void)
     Env->LastAlias = NULL;
     Env->ExcludeList = NULL;
     Env->LastExclude = NULL;
+    Env->FileList = NULL;
+    Env->LastFile = NULL;
 
     /* environment: frequest runtime stuff */
     Env->Files = 0;         /* will misuse that for statistics */
@@ -2192,6 +2492,7 @@ void FreeAllocations()
   if (Env)
   {
     /* free lists */
+    if (Env->FileList) FreeFileList(Env->FileList);
     if (Env->DataList) FreeDataList(Env->DataList);
     if (Env->LookupList) FreeLookupList(Env->LookupList);
     if (Env->AliasList) FreeAliasList(Env->AliasList);

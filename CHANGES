@@ -6,6 +6,13 @@
 
 ------------------------------------------------------------------------------
 
+* 2012-03 / Version 3.08
+
+mfreq-index:
+  - Added smart magic feature to select files matching specific condititions
+    as a magic. Namepattern and latest filedate are currently supported.
+
+
 * 2012-02 / Version 3.07
 
 all:

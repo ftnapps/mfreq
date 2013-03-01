@@ -36,7 +36,7 @@
 
 /* about */
 #define PROJECT          "mfreq"
-#define VERSION          "v3.07"
+#define VERSION          "v3.08"
 #define COPYRIGHT        "(c) 1994-2013 by Markus Reschke"
 
 /* default paths */
@@ -86,6 +86,10 @@
 #define SW_SEND_TEXT         16    /* send response text file */
 #define SW_ANY_CASE          32    /* case-insensitive file matching */
 #define SW_LOG_REQUEST       64    /* extensive logging */
+
+/* file flags (bitmask, 16 bits) */
+#define FILE_NONE             0    /* no flag set */
+#define FILE_SKIP             1    /* skip file */
 
 /* frequest flags (bitmask, 16 bits) */
 #define REQ_NONE              0    /* no flag set */
@@ -162,6 +166,16 @@ typedef struct token_type
   char                   *String;       /* contains single token */
   struct token_type      *Next;         /* pointer to next element */
 } Token_Type;
+
+
+/* file details (linked list) */
+typedef struct file_type
+{
+  char                   *Name;         /* filename */
+  time_t                 Time;          /* time of last file modifaction */
+  unsigned short         Flags;         /* additional flags/conditions */
+  struct file_type       *Next;         /* pointer to next element */
+} File_Type;
 
 
 /* file data for file index (linked list) */
@@ -323,6 +337,8 @@ typedef struct
   IndexAlias_Type   *LastAlias;         /* pointer to last element in list */
   Exclude_Type      *ExcludeList;       /* file exclusion (linked list) */
   Exclude_Type      *LastExclude;       /* pointer to last element in list */
+  File_Type         *FileList;          /* file details (linked list) */
+  File_Type         *LastFile;          /* pointer to last element in list */
 
   /* frequest configuration */
   char              *MailPath;          /* path of response mail */

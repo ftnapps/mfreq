@@ -2998,8 +2998,8 @@ _Bool ParseConfig(Token_Type *TokenList)
   _Bool                  Flag = False;        /* return value */
   unsigned short         Keyword = 0;        /* keyword ID */
   static char            *Keywords[11] =
-    {"LogFile", "Exclude", "InfoMode", "Define", "FileList",
-     "AddText", "FileArea", "Reset", "Include", "SharedFileArea", NULL};
+    {"FileArea", "SharedFileArea", "AddText", "Exclude", "Include",
+     "InfoMode", "Reset", "Define", "LogFile", "FileList", NULL};
 
   /* sanity check */
   if (TokenList == NULL) return Flag;
@@ -3016,44 +3016,45 @@ _Bool ParseConfig(Token_Type *TokenList)
           Env->CfgInUse, Env->CfgLinenumber, TokenList->String);        
         break;
 
-      case 1:       /* logfile */
-        Flag = Cmd_LogFile(TokenList);
-        break;
-
-      case 2:       /* exclude */
-        Flag = Cmd_Exclude(TokenList);
-        break;
-
-      case 3:       /* info mode */
-        Flag = Cmd_InfoMode(TokenList);
-        break;
-
-      case 4:       /* define */
-        Flag = Cmd_Define(TokenList);
-        break;
-
-      case 5:       /* filelist */
-        Flag = Cmd_FileList(TokenList);
-        break;
-
-      case 6:       /* add text */
-        Flag = Cmd_AddText(TokenList);
-        break;
-
-      case 7:       /* filearea */
+      case 1:       /* filearea */
         Flag = Cmd_FileArea(TokenList);
         break;
 
-      case 8:       /* reset */
-        Flag = Cmd_Reset(TokenList);
+      case 2:       /* shared filearea */
+        Flag = Cmd_SharedFileArea(TokenList);
         break;
 
-      case 9:       /* include */
+      case 3:       /* add text */
+        Flag = Cmd_AddText(TokenList);
+        break;
+
+      case 4:       /* exclude */
+        Flag = Cmd_Exclude(TokenList);
+        break;
+
+      case 5:       /* include */
         Flag = Cmd_Include(TokenList);
         break;
 
-      case 10:       /* shared filearea */
-        Flag = Cmd_SharedFileArea(TokenList);
+      case 6:       /* info mode */
+        Flag = Cmd_InfoMode(TokenList);
+        break;
+
+      case 7:       /* reset */
+        Flag = Cmd_Reset(TokenList);
+        break;
+
+      case 8:       /* define */
+        Flag = Cmd_Define(TokenList);
+        break;
+
+      case 9:       /* logfile */
+        Flag = Cmd_LogFile(TokenList);
+        break;
+
+      case 10:      /* filelist */
+        Flag = Cmd_FileList(TokenList);
+        break;
     }
   }
 
