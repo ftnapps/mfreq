@@ -181,15 +181,40 @@ single magic to several files add the same magic for each file.
 A password may be specified optionally to limit access.
 
 
++ SmartMagic Command (not implemented yet)
+
+Syntax:
+  SmartMagic <name> Path <path> [Pattern <pattern>] [Latest]
+    [PW <password>]
+
+This command allows you to create magics which select specific files within a
+directory based on given criteria. Following are supported:
+
+  Keyword                Selection
+  ---------------------------------------------------------------  
+  Pattern <pattern>      files matching the name pattern
+  Latest                 the latest file (modification time)
+
+You may combine the conditions and set a password optionally to limit access.
+
+A pattern supports following wildcards:
+  - ? for matching a single character
+  - * for matching any number of characters (including zero)
+
+Both wildcards may be used multiple times in a single pattern.
+
+
 + MagicPath Command
 
 Syntax:
   MagicPath <path>
 
 The MagicPath command specifies a directory containing special magic files.
-Such a magic file contains a list of filepaths and its name is the magics
-name. This is used by ifcico for example. You may use this command multiple
-times. If any file excludes are defined they'll be considered.
+Such a magic file is a simple text file containing filepaths (one filepath
+per line). The name of the magic file is used as name for the magic itself.
+This method is used by ifcico for example. You may use this command multiple
+times. If any file excludes are defined they'll be considered for the magic
+files, not for the filepaths in the magic files.
 
 
 + Exclude Command

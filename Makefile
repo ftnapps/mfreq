@@ -28,7 +28,7 @@ OBJ_COMMON = log.o misc.o tokenizer.o
 OBJ_MAIN = mfreq-index.o mfreq-list.o mfreq-srif.o 
 OBJ_EXTRA = index.o req.o fts.o list.o
 OBJECTS = ${OBJ_COMMON} ${OBJ_MAIN} ${OBJ_EXTRA}
-OBJ_INDEX = mfreq-index.o index.o ${OBJ_COMMON}
+OBJ_INDEX = mfreq-index.o index.o files.o ${OBJ_COMMON}
 OBJ_LIST = mfreq-list.o list.o index.o ${OBJ_COMMON}
 OBJ_SRIF = mfreq-srif.o index.o req.o fts.o ${OBJ_COMMON}
 
