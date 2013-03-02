@@ -36,11 +36,15 @@
 
 /* about */
 #define PROJECT          "mfreq"
-#define VERSION          "v3.06"
+#define VERSION          "v3.07"
 #define COPYRIGHT        "(c) 1994-2013 by Markus Reschke"
 
+/* default paths */
+#define DEFAULT_CFG_PATH      "/etc/fido/mfreq"
+#define DEFAULT_TMP_PATH      "/var/tmp"
+
 /* buffers (must not exceed maximum size of an Integer */
-#define DEFAULT_BUFFER_SIZE  4096            /* standard buffer */
+#define DEFAULT_BUFFER_SIZE   4096           /* standard buffer size */
 
 /* fileindex */
 #define SUFFIX_DATA      "data"
@@ -299,10 +303,13 @@ typedef struct
 
   /* file streams */
   FILE              *Log;               /* log file */
-  FILE              *List;              /* file list */
+  FILE              *List;              /* filelist */
 
   /* program control */
-  _Bool             Run;                /* proceed processing */
+  _Bool             Run;                /* stop/keep running */
+  unsigned short    ConfigDepth;        /* depth of cfg files (includes) */
+  char              *CfgInUse;          /* cfg currently parsed */
+  unsigned int      CfgLinenumber;      /* line number currently parsed */
 
   /* common configuration */
   unsigned short    CfgSwitches;        /* several cfg switches */
@@ -337,7 +344,7 @@ typedef struct
   char              *MailFilepath;      /* filepath of netmail */
   char              *TextFilepath;      /* filepath of textmail */
   
-  /* request(er) details */
+  /* frequest(er) details */
   char              *Sysop;             /* sysop name */
   AKA_Type          *ReqAKA;            /* requesters AKAs (linked list) */
   AKA_Type          *ReqLastAKA;        /* pointer to last element in list */

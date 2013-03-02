@@ -159,6 +159,23 @@ void Log(unsigned short int Type, const char *Line, ...)
 
 
 /* ************************************************************************
+ *   convenience logging functions
+ * ************************************************************************ */
+
+
+/*
+ *  log cfg parser error 
+ */
+
+void LogCfgError(void)
+{
+  Log(L_WARN, "Error in cfg file (%s), line %d!",
+    Env->CfgInUse, Env->CfgLinenumber);
+}
+
+
+
+/* ************************************************************************
  *   clean up of local definitions
  * ************************************************************************ */
 

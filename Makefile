@@ -1,6 +1,6 @@
 #
 # Makefile
-# (c) 1994-2012 by Markus Reschke
+# (c) 1994-2013 by Markus Reschke
 #
 
 
@@ -9,16 +9,19 @@ DIST = $(notdir ${CURDIR})
 NAME = mfreq
 VERSION = $(subst ${NAME}-,,${DIST})
 
+# global defaults (change if desired)
+#DEFINES = -DCFG_PATH="\"/etc/cfg-path\"" -DTMP_PATH="\"/tmp\""
+
 # compiler flags
 CC = gcc
-CFLAGS = -Wall -g -I/usr/include -I.
+CFLAGS = -Wall -g -I/usr/include -I. ${DEFINES}
 LDFLAGS =
 
 # libraries to link
 LIBS =
 
-# where to install binaries
-INSTALLDIR = /usr/local
+# where to install stuff
+PREFIX = /usr/local
 
 # objects
 OBJ_COMMON = log.o misc.o tokenizer.o
@@ -81,9 +84,9 @@ dist: ${PROGS}
 
 install: ${PROGS}
 	strip ${PROGS}
-	cp -f mfreq-index ${INSTALLDIR}/bin
-	cp -f mfreq-list ${INSTALLDIR}/bin
-	cp -f mfreq-srif ${INSTALLDIR}/bin
+	cp -f mfreq-index ${PREFIX}/bin
+	cp -f mfreq-list ${PREFIX}/bin
+	cp -f mfreq-srif ${PREFIX}/bin
 
 
 #

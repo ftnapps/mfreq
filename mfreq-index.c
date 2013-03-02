@@ -16,8 +16,7 @@
 
 /* defaults for this program */
 #define NAME            "mfreq-index"
-#define DEFAULT_CFG     "/etc/fido/mfreq/index.cfg"
-
+#define CFG_FILENAME    "index.cfg"
 
 
 /*
@@ -36,6 +35,26 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <dirent.h>
+
+
+/*
+ *  more local constants
+ */
+
+/* update configuration path */
+#ifndef CFG_PATH
+  #define CFG_PATH       DEFAULT_CFG_PATH
+#endif
+
+/* build configuration filepath */
+#define CFG_FILEPATH     CFG_PATH"/"CFG_FILENAME
+
+
+/*
+ *  local functions
+ */
+
+_Bool ReadConfig(char *Filepath);
 
 
 
@@ -640,16 +659,103 @@ _Bool ProcessPath(char *Path, char *PW, int Depth, _Bool AutoMagic)
 
 
 /*
- *  write file index
- *  Syntax: Index <filepath>
- *  (.data, .lookup and .alias will be appended)
+ *  include file
+ *  Syntax: Include [Config <filepath>]
  *
  *  returns:
  *  - 1 on success
  *  - 0 on error
  */
 
-_Bool Cmd_Index(Token_Type *TokenList, unsigned int Line)
+_Bool Cmd_Include(Token_Type *TokenList)
+{
+  _Bool                  Flag = False;       /* return value */
+  _Bool                  Run = True;         /* control flag */
+  _Bool                  Error = False;      /* error flag */
+  unsigned short         Keyword = 0;        /* keyword ID */
+  static char            *Keywords[3] =
+    {"Include", "Config", NULL};
+
+  /* sanity check */
+  if (TokenList == NULL) return Flag;
+
+
+  /*
+   *  parse tokens
+   */
+
+  while (Run && TokenList && TokenList->String)
+  {
+    if (Keyword > 0)          /* get value */
+    {
+      switch (Keyword)
+      {
+        case 2:          /* config */
+          if (Env->ConfigDepth >= 2)         /* limit cfg depth */
+          {
+            Log(L_WARN, "Cfg file depth exceeded!");
+            Run = False;                     /* end loop */
+          }
+          else                               /* include cfg file */
+          {
+            Run = ReadConfig(TokenList->String);
+            if (Run == False) Error = True;       /* signal error */
+          }
+      }
+
+      Keyword = 0;            /* reset */
+    }
+    else                      /* get keyword */
+    {
+      Keyword = GetKeyword(Keywords, TokenList->String);
+
+      switch (Keyword)           /* keywords without data */
+      {
+        case 0:          /* unknown keyword */
+          Run = False;
+          break;
+
+        case 1:          /* command itself */
+          Keyword = 0;        /* reset keyword */
+       }
+    }
+
+    TokenList = TokenList->Next;     /* goto to next token */
+  }
+
+
+  /*
+   *  check parser results
+   */
+
+  if ((Run == False) || (Keyword > 0))  /* problem occured */
+  {
+    if (Error == False)                 /* syntax error */
+    {
+      LogCfgError();
+    }
+  }
+  else                                  /* went fine */
+  {
+    Flag = True;       /* signal success */
+  }
+
+  return Flag;
+}
+
+
+
+/*
+ *  write file index
+ *  Syntax: Index <filepath>
+ *  (.data, .lookup, .alias and .offset will be appended)
+ *
+ *  returns:
+ *  - 1 on success
+ *  - 0 on error
+ */
+
+_Bool Cmd_Index(Token_Type *TokenList)
 {
   _Bool             Flag = False;            /* return value */
   _Bool             Run = True;              /* control flag */
@@ -710,7 +816,7 @@ _Bool Cmd_Index(Token_Type *TokenList, unsigned int Line)
   if ((Run == False) || (Get > 0) || (FilepathToken == NULL))
   {
     Run = False;
-    Log(L_WARN, "Syntax error in cfg file, line %d!", Line);
+    LogCfgError();
   }
 
 
@@ -989,6 +1095,116 @@ _Bool Cmd_Index(Token_Type *TokenList, unsigned int Line)
 
 
 /*
+ *  add directory to files (shared with mfreq-list)
+ *  Syntax: SharedFileArea Path <path> [PW <password>] [Depth <depth>] [AutoMagic]
+ *            [Name <name>] [Info <description>]
+ *
+ *  returns:
+ *  - 1 on success
+ *  - 0 on error
+ */
+
+_Bool Cmd_SharedFileArea(Token_Type *TokenList)
+{
+  _Bool             Flag = False;       /* return value */
+  _Bool             Run = True;         /* control flag */
+  unsigned short    Keyword = 0;        /* keyword ID */
+  char              *Path = NULL;
+  char              *Password = NULL;
+  int               Depth = 0;          /* depth of recursion */
+  _Bool             AutoMagic = False;
+  static char       *Keywords[8] =
+    {"SharedFileArea", "Path", "AutoMagic", "Depth", "PW",
+     "Name", "Info", NULL};
+
+  /* sanity check */
+  if (TokenList == NULL) return Flag;
+
+
+  /*
+   *  parse tokens
+   */
+
+  while (Run && TokenList && TokenList->String)
+  {
+    if (Keyword > 0)          /* get value */
+    {
+      switch (Keyword)
+      {
+        case 2:     /* path */
+          Path = TokenList->String;
+          break;
+
+        case 4:     /* depth */
+          Depth = Str2Long(TokenList->String);
+          if ((Depth < 0) || (Depth > 10))    /* invalid value */
+          {
+            Log(L_WARN, "Invalid recursion depth!");
+            Run = False;           /* end loop & signal problem */
+          }
+          break;
+
+        case 5:     /* password */
+          Password = TokenList->String;
+
+        /* Other keywords with values belong to mfreq-list,
+           so we simply skip them. */
+      }
+
+      Keyword = 0;            /* reset */
+    }
+    else                      /* get keyword */
+    {
+      Keyword = GetKeyword(Keywords, TokenList->String);
+
+      switch (Keyword)        /* keywords without data */
+      {
+        case 0:               /* unknown keyword */
+          Run = False;
+          break;
+
+        case 1:               /* command itself */
+          /* simply skip it */
+          Keyword = 0;        /* reset keyword */
+          break;
+
+        case 3:               /* automagic switch */
+          AutoMagic = True;
+          Keyword = 0;        /* reset keyword */
+      }
+    }
+
+    TokenList = TokenList->Next;     /* goto to next token */
+  }
+
+
+  /*
+   *  check parser results
+   */
+
+  if ((Run == False) || (Keyword > 0) || (Path == NULL))
+  {
+    Run = False;
+    LogCfgError();
+  }
+
+
+  /*
+   *  process
+   */
+
+  if (Run)
+  {
+    /* open path and process files */
+    Flag = ProcessPath(Path, Password, Depth, AutoMagic);
+  }
+
+  return Flag;
+}
+
+
+
+/*
  *  add directory to files
  *  Syntax: FileArea <path> [PW <password>] [Depth <depth>] [AutoMagic]
  *
@@ -997,7 +1213,7 @@ _Bool Cmd_Index(Token_Type *TokenList, unsigned int Line)
  *  - 0 on error
  */
 
-_Bool Cmd_FileArea(Token_Type *TokenList, unsigned int Line)
+_Bool Cmd_FileArea(Token_Type *TokenList)
 {
   _Bool             Flag = False;       /* return value */
   _Bool             Run = True;         /* control flag */
@@ -1031,8 +1247,8 @@ _Bool Cmd_FileArea(Token_Type *TokenList, unsigned int Line)
           Depth = Str2Long(TokenList->String);
           if ((Depth < 0) || (Depth > 10))    /* invalid value */
           {
-            Log(L_WARN, "Invalid recursion depth in cfg line %d!", Line);
-            Depth = 0;           /* set default */
+            Log(L_WARN, "Invalid recursion depth!");
+            Run = False;           /* end loop & signal problem */
           }
           break;
 
@@ -1069,7 +1285,7 @@ _Bool Cmd_FileArea(Token_Type *TokenList, unsigned int Line)
   if ((Run == False) || (Keyword > 0) || (Path == NULL))
   {
     Run = False;
-    Log(L_WARN, "Syntax error in cfg file, line %d!", Line);
+    LogCfgError();
   }
 
 
@@ -1097,7 +1313,7 @@ _Bool Cmd_FileArea(Token_Type *TokenList, unsigned int Line)
  *  - 0 on error
  */
 
-_Bool Cmd_Exclude(Token_Type *TokenList, unsigned int Line)
+_Bool Cmd_Exclude(Token_Type *TokenList)
 {
   _Bool             Flag = False;       /* return value */
   _Bool             Run = True;         /* control flag */
@@ -1139,7 +1355,7 @@ _Bool Cmd_Exclude(Token_Type *TokenList, unsigned int Line)
   if ((Run == False) || (Get > 0) || (NameToken == NULL))
   {
     Run = False;
-    Log(L_WARN, "Syntax error in cfg file, line %d!", Line);
+    LogCfgError();
   }
 
 
@@ -1168,7 +1384,7 @@ _Bool Cmd_Exclude(Token_Type *TokenList, unsigned int Line)
  *  - 0 on error
  */
 
-_Bool Cmd_MagicPath(Token_Type *TokenList, unsigned int Line)
+_Bool Cmd_MagicPath(Token_Type *TokenList)
 {
   _Bool             Flag = False;       /* return value */
   _Bool             Run = True;         /* control flag */
@@ -1210,7 +1426,7 @@ _Bool Cmd_MagicPath(Token_Type *TokenList, unsigned int Line)
   if ((Run == False) || (Get >0) || (PathToken == NULL))
   {
     Run = False;
-    Log(L_WARN, "Syntax error in cfg file, line %d!", Line);
+    LogCfgError();
   }
 
 
@@ -1238,7 +1454,7 @@ _Bool Cmd_MagicPath(Token_Type *TokenList, unsigned int Line)
  *  - 0 on error
  */
 
-_Bool Cmd_Magic(Token_Type *TokenList, unsigned int Line)
+_Bool Cmd_Magic(Token_Type *TokenList)
 {
   _Bool             Flag = False;       /* return value */
   _Bool             Run = True;         /* control flag */
@@ -1296,7 +1512,7 @@ _Bool Cmd_Magic(Token_Type *TokenList, unsigned int Line)
   if ((Run == False) || (Keyword > 0) || (Name == NULL) || (Filepath == NULL))
   {
     Run = False;
-    Log(L_WARN, "Syntax error in cfg file, line %d!", Line);
+    LogCfgError();
   }
 
 
@@ -1329,7 +1545,7 @@ _Bool Cmd_Magic(Token_Type *TokenList, unsigned int Line)
  *  - 0 on error
  */
 
-_Bool Cmd_Reset(Token_Type *TokenList, unsigned int Line)
+_Bool Cmd_Reset(Token_Type *TokenList)
 {
   _Bool                  Flag = False;       /* return value */
   _Bool                  Run = True;         /* control flag */
@@ -1382,7 +1598,7 @@ _Bool Cmd_Reset(Token_Type *TokenList, unsigned int Line)
 
   if (Run == False)
   {
-    Log(L_WARN, "Syntax error in cfg file, line %d!", Line);
+    LogCfgError();
   }
   else
   {
@@ -1403,7 +1619,7 @@ _Bool Cmd_Reset(Token_Type *TokenList, unsigned int Line)
  *  - 0 on error
  */
 
-_Bool Cmd_SetMode(Token_Type *TokenList, unsigned int Line)
+_Bool Cmd_SetMode(Token_Type *TokenList)
 {
   _Bool                  Flag = False;       /* return value */
   _Bool                  Run = True;         /* control flag */
@@ -1452,11 +1668,11 @@ _Bool Cmd_SetMode(Token_Type *TokenList, unsigned int Line)
 
   if (Run == False)
   {
-    Log(L_WARN, "Syntax error in cfg file, line %d!", Line);
+    LogCfgError();            /* syntax error */
   }
   else
   {
-    Flag = True;       /* signal success */
+    Flag = True;              /* signal success */
   }
 
   return Flag;
@@ -1473,7 +1689,7 @@ _Bool Cmd_SetMode(Token_Type *TokenList, unsigned int Line)
  *  - 0 on error
  */
 
-_Bool Cmd_LogFile(Token_Type *TokenList, unsigned int Line)
+_Bool Cmd_LogFile(Token_Type *TokenList)
 {
   _Bool             Flag = False;            /* return value */
   _Bool             Run = True;              /* control flag */
@@ -1488,7 +1704,7 @@ _Bool Cmd_LogFile(Token_Type *TokenList, unsigned int Line)
   if (Env->LogFilepath)
   {
     Log(L_WARN, "Logfile already set!");
-    return Flag;
+    Run = False;
   }
 
 
@@ -1523,7 +1739,7 @@ _Bool Cmd_LogFile(Token_Type *TokenList, unsigned int Line)
   if ((Run == False) || (Get > 0) || (FilepathToken == NULL))
   {
     Run = False;
-    Log(L_WARN, "Syntax error in cfg file, line %d!", Line);
+    LogCfgError();
   }
 
 
@@ -1556,13 +1772,13 @@ _Bool Cmd_LogFile(Token_Type *TokenList, unsigned int Line)
  *  - 0 on error
  */
 
-_Bool ParseConfig(Token_Type *TokenList, unsigned int Line)
+_Bool ParseConfig(Token_Type *TokenList)
 {
   _Bool                  Flag = False;       /* return value */
   unsigned short         Keyword = 0;        /* keyword ID */
-  static char            *Keywords[9] =
+  static char            *Keywords[11] =
     {"LogFile", "SetMode", "Reset", "Magic", "MagicPath",
-     "Exclude", "FileArea", "Index", NULL};
+     "Exclude", "FileArea", "Index", "Include", "SharedFileArea", NULL};
 
   /* sanity check */
   if (TokenList == NULL) return Flag;
@@ -1575,40 +1791,48 @@ _Bool ParseConfig(Token_Type *TokenList, unsigned int Line)
     switch (Keyword)           /* command keywords */
     {
       case 0:       /* unknown command */
-        Log(L_WARN, "Unknown command in cfg file line %d (%s)!",
-          Line, TokenList->String);        
+        Log(L_WARN, "Unknown command in cfg file (%s), line %d (%s)!",
+          Env->CfgInUse, Env->CfgLinenumber, TokenList->String);        
         break;
 
       case 1:       /* logfile */
-        Flag = Cmd_LogFile(TokenList, Line);
+        Flag = Cmd_LogFile(TokenList);
         break;
 
       case 2:       /* set mode */
-        Flag = Cmd_SetMode(TokenList, Line);
+        Flag = Cmd_SetMode(TokenList);
         break;
 
       case 3:       /* reset */
-        Flag = Cmd_Reset(TokenList, Line);
+        Flag = Cmd_Reset(TokenList);
         break;
 
       case 4:       /* magic */
-        Flag = Cmd_Magic(TokenList, Line);
+        Flag = Cmd_Magic(TokenList);
         break;
 
       case 5:       /* magicpatch */
-        Flag = Cmd_MagicPath(TokenList, Line);
+        Flag = Cmd_MagicPath(TokenList);
         break;
 
       case 6:       /* exclude */
-        Flag = Cmd_Exclude(TokenList, Line);
+        Flag = Cmd_Exclude(TokenList);
         break;
 
       case 7:       /* filearea */
-        Flag = Cmd_FileArea(TokenList, Line);
+        Flag = Cmd_FileArea(TokenList);
         break;
 
       case 8:       /* index */
-        Flag = Cmd_Index(TokenList, Line);
+        Flag = Cmd_Index(TokenList);
+        break;
+
+      case 9:       /* include */
+        Flag = Cmd_Include(TokenList);
+        break;
+
+      case 10:       /* shared filearea */
+        Flag = Cmd_SharedFileArea(TokenList);
     }
   }
 
@@ -1625,44 +1849,57 @@ _Bool ParseConfig(Token_Type *TokenList, unsigned int Line)
  *  - 0 on error
  */
 
-_Bool ReadConfig()
+_Bool ReadConfig(char *Filepath)
 {
-  _Bool                  Flag = False;        /* return value */
-  _Bool                  Run = True;          /* loop control */
-  FILE                   *Cfg;                /* cfg filestream */
+  _Bool                  Flag = False;       /* return value */
+  _Bool                  Run = True;         /* loop control */
+  FILE                   *File;              /* filestream */
   size_t                 Length;
   char                   *HelpStr;
   Token_Type             *TokenList;
-  unsigned int           Line = 0;            /* line number */
+  unsigned int           Line = 0;           /* line number */
+  unsigned int           OldLine;            /* old linenumber */
+  char                   *OldCfg;            /* old filepath */
 
-  Cfg = fopen(Env->CfgFilepath, "r");         /* read mode */
-  if (Cfg)
+  /* sanity check */
+  if (Filepath == NULL) return Flag;
+
+  Env->ConfigDepth++;              /* increase cfg file depth */
+
+  File = fopen(Filepath, "r");     /* open file in read mode */
+  if (File)
   {
+    /* setup data for logging */
+    OldCfg = Env->CfgInUse;        /* save old cfg filepath */
+    Env->CfgInUse = Filepath;      /* update cfg filepath */
+    OldLine = Env->CfgLinenumber;  /* save old linenumber */
+
     while (Run)
     {
       /* read line-wise */
-      if (fgets(InBuffer, DEFAULT_BUFFER_SIZE, Cfg) != NULL)
+      if (fgets(InBuffer, DEFAULT_BUFFER_SIZE, File) != NULL)
       {
         Length = strlen(InBuffer);
 
-        if (Length == 0)                  /* sanity check */
+        if (Length == 0)                /* sanity check */
         {
-          Run = False;                         /* end loop */
+          Run = False;                       /* end loop */
         }
-        else if (Length == (DEFAULT_BUFFER_SIZE - 1))         /* maximum size reached */
+        else if (Length == (DEFAULT_BUFFER_SIZE - 1))  /* maximum size reached */
         {
           /* now check if line matches buffer size exacly or exceeds it */
           /* exact matches should have a LF as last character in front of the trailing 0 */
-          if (InBuffer[Length - 1] != 10)             /* pre-last char is not LF */
+          if (InBuffer[Length - 1] != 10)              /* pre-last char is not LF */
           {
-            Run = False;                         /* end loop */
-            Log(L_WARN, "Input overflow for cfg file!");
+            Run = False;                               /* end loop */
+            Log(L_WARN, "Input overflow for line %d in cfg file (%s)!", ++Line, Filepath);
           }
         }
 
-        if (Run)       /* if still in business */
+        if (Run)         /* if still in business */
         {
-          Line++;            /* got another line */
+          Line++;                       /* got another line */
+          Env->CfgLinenumber = Line;    /* update linenumber for logging */
 
           /* remove LF at end of line */
           if (InBuffer[Length - 1] == 10)
@@ -1678,29 +1915,34 @@ _Bool ReadConfig()
           /* if it's not an empty line or a comment line, process it */
           if ((HelpStr[0] != 0) && (HelpStr[0] != '#'))
           {
-            TokenList = Tokenize(HelpStr);      /* tokenize line */
+            TokenList = Tokenize(HelpStr);        /* tokenize line */
 
             if (TokenList)
             {
-              Flag = ParseConfig(TokenList, Line);
-              if (Flag == False) Run = False;        /* end loop on error */
-              FreeTokenlist(TokenList);              /* free linked list */
+              Flag = ParseConfig(TokenList);
+              if (Flag == False) Run = False;     /* end loop on error */
+              FreeTokenlist(TokenList);           /* free linked list */
             }
           }
         }
       }
-      else                     /* EOF or error */
+      else                    /* EOF or error */
       {
-        Run = False;        /* end loop */
+        Run = False;          /* end loop */
       }
     }
 
-    fclose(Cfg);             /* close file */
+    /* clean up */
+    fclose(File);                  /* close file */
+    Env->CfgInUse = OldCfg;        /* restore old cfg filepath */
+    Env->CfgLinenumber = OldLine;  /* restore old linenumber */
   }
-  else
+  else                        /* error */
   {
-    Log(L_WARN, "Couldn't open configuration file (%s)!", Env->CfgFilepath);
+    Log(L_WARN, "Couldn't open cfg file (%s)!", Filepath);
   }
+
+  if (Env->ConfigDepth > 0) Env->ConfigDepth--;   /* decrease cfg file depth */
 
   return Flag;
 }
@@ -1818,7 +2060,7 @@ _Bool ParseCommandLine(int argc, char *argv[])
     /* set default config filepath */
     if (Env->CfgFilepath == NULL)
     {
-      Env->CfgFilepath = CopyString(DEFAULT_CFG);
+      Env->CfgFilepath = CopyString(CFG_FILEPATH);
     }
   }
  
@@ -1914,6 +2156,9 @@ _Bool GetAllocations(void)
 
     /* environment: program control */
     Env->Run = True;
+    Env->ConfigDepth = 0;
+    Env->CfgInUse = NULL;
+    Env->CfgLinenumber = 0;
 
     /* environment: common configuration */
     Env->CfgSwitches = SW_NONE;
@@ -2041,7 +2286,7 @@ int main(int argc, char *argv[])
 
   if (Flag && Env->Run)
   {
-    Flag = ReadConfig();        /* read and parse config */
+    Flag = ReadConfig(Env->CfgFilepath);     /* read and parse config */
   }
 
 

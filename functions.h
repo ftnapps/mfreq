@@ -21,6 +21,8 @@
 
   extern void Log(unsigned short int Type, const char *Line, ...);
 
+  extern void LogCfgError(void);
+
 #endif
 
 
