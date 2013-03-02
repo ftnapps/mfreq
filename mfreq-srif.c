@@ -2571,8 +2571,8 @@ _Bool ParseConfig(Token_Type *TokenList)
   _Bool                  Flag = False;       /* return value */
   unsigned short         Keyword = 0;        /* keyword ID */
   static char            *Keywords[9] =
-    {"LogFile", "SetMode", "Address", "Index", "MailDir",
-     "MailHeader", "MailFooter", "Limit", NULL};
+    {"MailHeader", "MailFooter", "Limit", "Address", "Index",
+     "LogFile", "MailDir", "SetMode", NULL};
 
   /* sanity check */
   if (TokenList == NULL) return Flag;
@@ -2589,36 +2589,37 @@ _Bool ParseConfig(Token_Type *TokenList)
           Env->CfgInUse, Env->CfgLinenumber, TokenList->String);        
         break;
 
-      case 1:       /* logfile */
-        Flag = Set_LogFile(TokenList);
+      case 1:       /* mail header */
+        Flag = Add_MailText(TokenList);
         break;
 
-      case 2:       /* set mode */
-        Flag = Set_Mode(TokenList);
+      case 2:       /* mail footer */
+        Flag = Add_MailText(TokenList);
         break;
 
-      case 3:       /* address */
+      case 3:       /* limit */
+        Flag = Add_Limit(TokenList);
+        break;
+
+      case 4:       /* address */
         Flag = Add_AKA(TokenList);
         break;
 
-      case 4:       /* index */
+      case 5:       /* index */
         Flag = Add_Index(TokenList);
         break;
 
-      case 5:       /* maildir */
+      case 6:       /* logfile */
+        Flag = Set_LogFile(TokenList);
+        break;
+
+      case 7:       /* maildir */
         Flag = Set_MailPath(TokenList);
         break;
 
-      case 6:       /* mail header */
-        Flag = Add_MailText(TokenList);
+      case 8:       /* set mode */
+        Flag = Set_Mode(TokenList);
         break;
-
-      case 7:       /* mail footer */
-        Flag = Add_MailText(TokenList);
-        break;
-
-      case 8:       /* limit */
-        Flag = Add_Limit(TokenList);
     }
   }
 
