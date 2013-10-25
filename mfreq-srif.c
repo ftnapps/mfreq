@@ -2401,9 +2401,9 @@ _Bool Set_Mode(Token_Type *TokenList)
   _Bool                  Flag = False;       /* return value */
   _Bool                  Run = True;         /* control flag */
   unsigned short         Keyword = 0;        /* keyword ID */
-  static char            *Keywords[8] =
-    {"SetMode", "NetMail", "TextMail", "RemoveReq", "AnyCase",
-     "BinarySearch", "LogRequest", NULL};
+  static char            *Keywords[9] =
+    {"SetMode", "NetMail", "NetMail+", "TextMail", "RemoveReq",
+     "AnyCase", "BinarySearch", "LogRequest", NULL};
 
   /* sanity check */
   if (TokenList == NULL) return Flag;
@@ -2427,27 +2427,31 @@ _Bool Set_Mode(Token_Type *TokenList)
         /* just skip */
         break;
 
-      case 2:       /* netmail */
-        Env->CfgSwitches |= SW_SEND_NETMAIL;
+      case 2:       /* netmail type-2 */
+        Env->CfgSwitches |= SW_SEND_NETMAIL | SW_TYPE_2;
         break;
 
-      case 3:       /* textmail */
+      case 3:       /* netmail type-2+ */
+        Env->CfgSwitches |= SW_SEND_NETMAIL | SW_TYPE_2PLUS;
+        break;
+
+      case 4:       /* textmail */
         Env->CfgSwitches |= SW_SEND_TEXT;
         break;
 
-      case 4:       /* remove .req */
+      case 5:       /* remove .req */
         Env->CfgSwitches |= SW_DELETE_REQUEST;
         break;
 
-      case 5:       /* any case */
+      case 6:       /* any case */
         Env->CfgSwitches |= SW_ANY_CASE;
         break;
 
-      case 6:       /* binary search */
+      case 7:       /* binary search */
         Env->CfgSwitches |= SW_BINARY_SEARCH;
         break;
 
-      case 7:       /* log request */
+      case 8:       /* log request */
         Env->CfgSwitches |= SW_LOG_REQUEST;
         break;
     }
@@ -2683,7 +2687,8 @@ _Bool ReadConfig(char *Filepath)
 
         if (Run)       /* if still in business */
         {
-          Line++;            /* got another line */
+          Line++;                       /* got another line */
+          Env->CfgLinenumber = Line;    /* update linenumber for logging */
 
           /* remove LF at end of line */
           if (InBuffer[Length - 1] == 10)
@@ -2879,7 +2884,7 @@ _Bool ParseCommandLine(int argc, char *argv[])
    *  check parser results
    */
 
-  if (Keyword > 0)             /* missing arguement  */
+  if (Keyword > 0)             /* missing argument  */
   {
     Log(L_WARN, "Missing argument!");
     Flag = False;

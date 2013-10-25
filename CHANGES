@@ -6,6 +6,14 @@
 
 ------------------------------------------------------------------------------
 
+* 2013-10 / Version 3.09
+
+mfreq-srif:
+  - Added support for FSC-0048 Type-2+ packets (SetMode NetMail+).
+  - Simplified Month2String();
+  - Fixed linenumber bug in error reporting for the configuration file. 
+
+
 * 2012-03 / Version 3.08
 
 mfreq-index:
