@@ -33,7 +33,7 @@
  *  constants
  */
 
-/* message attributes */
+/* message attributes (bitmask, 16 bits) */
 #define ATTR_PRIVATE                    0b0000000000000001
 #define ATTR_CRASH                      0b0000000000000010
 #define ATTR_RECD                       0b0000000000000100
@@ -51,6 +51,11 @@
 #define ATTR_AUDIT_REQUEST              0b0100000000000000
 #define ATTR_FILE_UPDATE_REQ            0b1000000000000000
 
+/* capability word / supported bundle types (bitmask, 16 bits) */
+#define CW_STONEAGE           0b0000000000000000
+#define CW_2                  0b0000000000000001
+#define CW_2PLUS              0b0000000000000001
+
 
 
 /*
@@ -58,7 +63,7 @@
  */
 
 
-/* packet header based on FTS-0001 */
+/* type-2 packet header (FTS-0001) */
 typedef struct
 {
   /* byte order for all 16 bit values: LSB MSB */
@@ -88,10 +93,10 @@ typedef struct
   unsigned short    origZone;      /* origin zone */
   unsigned short    destZone;      /* destination zone */
   unsigned char     fill[20];      /* padding, null padded */
-} PacketHeader_Type;
+} PacketHeader2_Type;
 
 
-/* packet header based on FSC-0039 */
+/* type-2 extended packet header (FSC-0039) */
 typedef struct
 {
   /* byte order for all 16 bit values: LSB MSB */
@@ -114,12 +119,13 @@ typedef struct
                                    /* value: 2 (0x02 0x00) */
   unsigned short    OrgNet;        /* origin net */
   unsigned short    DstNet;        /* destination net */
-  unsigned char     PrdCod_l;      /* FTSC product code LSB */
+  unsigned char     PrdCod_L;      /* FTSC product code LSB */
   unsigned char     PVMajor;       /* product revision MSB */
   unsigned char     Password[8];   /* password, null padded */
   unsigned short    QOrgZone;      /* origin zone (ZMailQ,QMail) */
+  unsigned short    QDestZone;     /* destination zone (ZMailQ,QMail) */
   unsigned char     Filler[4];     /* spare */
-  unsigned char     PrdCod_h;      /* FTSC product code MSB */
+  unsigned char     PrdCod_H;      /* FTSC product code MSB */
   unsigned char     PVMinor;       /* FTSC product revision LSB */
   unsigned short    CapWord;       /* capability word */
   unsigned short    OrigZone;      /* origination zone */
@@ -127,10 +133,54 @@ typedef struct
   unsigned short    OrigPoint;     /* origination point */
   unsigned short    DestPoint;     /* destination point */
   unsigned char     ProdData[4];   /* product specific data */
-} PacketHeader2_Type;
+} PacketHeader3ext_Type;
 
 
-/* message header based on FTS-0001 */
+/* type-2+ packet header (FSC-0048) */
+typedef struct
+{
+  /* byte order for all 16 bit values: LSB MSB */
+  unsigned short    origNode;      /* origin node */
+  unsigned short    destNode;      /* destination node */
+  unsigned short    year;          /* year of packet creation */
+                                   /* value range: 1-65535 */
+  unsigned short    month;         /* month of packet creation */
+                                   /* value range: 0-11 for Jan-Dec */
+  unsigned short    day;           /* day of packet creation */
+                                   /* value range: 1-31 */
+  unsigned short    hour;          /* hour of packet creation */
+                                   /* value range: 0-23 */
+  unsigned short    minute;        /* minute  of packet creation */
+                                   /* value range: 0-59 */
+  unsigned short    second;        /* second of packet creation */
+                                   /* value range: 0-59 */
+  unsigned short    baud;          /* max. bps rate of orig and dest */
+  unsigned short    packetType;    /* packet version */
+                                   /* value: 2 (0x02 0x00) */
+  unsigned short    origNet;       /* origin net */
+                                   /* -1 if from point */
+  unsigned short    destNet;       /* destination net */
+  unsigned char     ProductCode_L; /* FTSC product code LSB */
+  unsigned char     Revision_H;    /* product major revision */
+  unsigned char     password[8];   /* password, null padded */
+                                   /* valid chars: A-Z, 0-9 */
+  unsigned short    QorigZone;     /* origin zone (as in QMail) */
+  unsigned short    QdestZone;     /* destination zone (as in QMail) */
+  unsigned short    AuxNet;        /* origin net if origin is a point */
+  unsigned short    CWvalidationCopy;  /* copy of capability word */
+                                       /* in reversed byte order (MSB LSB) */
+  unsigned char     ProductCode_H; /* FTSC product code MSB */
+  unsigned char     Revision_L;    /* product minor revision */
+  unsigned short    CapabilWord;   /* capability word */
+  unsigned short    origZone;      /* origination zone (as in FD etc) */
+  unsigned short    destZone;      /* destination zone (as in FD etc) */
+  unsigned short    origPoint;     /* origination point (as in FD etc) */
+  unsigned short    destPoint;     /* destination point (as in FD etc) */
+  unsigned char     ProdData[4];   /* product specific data */
+} PacketHeader2plus_Type;
+
+
+/* message header (FTS-0001) */
 typedef struct
 {
   /* byte order for all 16 bit values: LSB MSB */
@@ -410,74 +460,27 @@ _Bool MatchAKAs(AKA_Type *AKA1, AKA_Type *AKA2)
 
 
 /*
- *  convert month number (0-11) to string
+ *  convert number of month (0-11) to string
  *
  *  returns:
  *  - 1 on success
  *  - 0 on error
  */
 
-_Bool Month2String(int Number, char *String, int Length)
+_Bool Month2String(unsigned int Number, char *String, unsigned int Length)
 {
-  _Bool                  Flag = False;        /* return value */
+  _Bool             Flag = False;        /* return value */
+  char              *Months[12] =
+    {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
   /* sanity checks */
   if ((String == NULL) || (Length < 4)) return Flag;
 
-  Flag = True;
-
-  switch (Number)
+  if (Number <= 11)
   {
-    case 0:
-      strcpy(String, "Jan");
-      break;
-
-    case 1:
-      strcpy(String, "Feb");
-      break;
-
-    case 2:
-      strcpy(String, "Mar");
-      break;
-
-    case 3:
-      strcpy(String, "Apr");
-      break;
-
-    case 4:
-      strcpy(String, "May");
-      break;
-
-    case 5:
-      strcpy(String, "Jun");
-      break;
-
-    case 6:
-      strcpy(String, "Jul");
-      break;
-
-    case 7:
-      strcpy(String, "Aug");
-      break;
-
-    case 8:
-      strcpy(String, "Sep");
-      break;
-
-    case 9:
-      strcpy(String, "Oct");
-      break;
-
-    case 10:
-      strcpy(String, "Nov");
-      break;
-
-    case 11:
-      strcpy(String, "Dec");
-      break;
-
-    default:
-      Flag = False;
+    strcpy(String, Months[Number]);
+    Flag = True;              /* signal success */
   }
 
   return Flag;
@@ -498,50 +501,91 @@ _Bool Month2String(int Number, char *String, int Length)
 _Bool WritePacketHeader(FILE *File)
 {
   _Bool                  Flag = False;        /* return value */
-  PacketHeader_Type      *Packet;
+  PacketHeader2_Type     *Packet2;
+  PacketHeader2plus_Type *Packet2plus;
   unsigned short         n;
-/*  unsigned short         Value;
-  unsigned char          *LSB, *MSB; */
 
   /* sanity check */
   if (File == NULL) return Flag;
 
-  /* init byte extraction */
-/*  LSB = (unsigned char *)&Value;
-  MSB = LSB;
-  MSB++; */
+  /* all packet header types got the same size */
+  Packet2 = malloc(sizeof(PacketHeader2_Type));   /* allocate memory */
 
-  Packet = malloc(sizeof(PacketHeader_Type));    /* allocate memory */
-
-  if (Packet)
+  if (Packet2)
   {
-    /* fill in data */
-    Packet->origNode = htole16(Env->ActiveLocalAKA->Node);
-    Packet->destNode = htole16(Env->ActiveRemoteAKA->Node);
-    Packet->year = htole16(Env->DateTime.tm_year + 1900);
-    Packet->month = htole16(Env->DateTime.tm_mon);
-    Packet->day = htole16(Env->DateTime.tm_mday);
-    Packet->hour = htole16(Env->DateTime.tm_hour);
-    Packet->minute = htole16(Env->DateTime.tm_min);
-    Packet->second = htole16(Env->DateTime.tm_sec);
-    Packet->baud = 0;
-    Packet->packetType = htole16(2);
-    Packet->origNet = htole16(Env->ActiveLocalAKA->Net);
-    Packet->destNet = htole16(Env->ActiveRemoteAKA->Net);
-    Packet->prodCode = 254;                 /* request one from FTSC? */
-    Packet->serialNo = 0;
-    for (n = 0; n < 8; n++) Packet->password[n] = 0;      /* null padded */
-    Packet->origZone = htole16(Env->ActiveLocalAKA->Zone);
-    Packet->destZone = htole16(Env->ActiveRemoteAKA->Zone);
-    for (n = 0; n < 20; n++) Packet->fill[n] = 0;         /* null padded */
+    /*
+     *  fill in common data
+     */
 
-    /* write packet header */
-    if (fwrite(Packet, sizeof(PacketHeader_Type), 1, File) == 1)
+    Packet2->origNode = htole16(Env->ActiveLocalAKA->Node);
+    Packet2->destNode = htole16(Env->ActiveRemoteAKA->Node);
+    Packet2->year = htole16(Env->DateTime.tm_year + 1900);
+    Packet2->month = htole16(Env->DateTime.tm_mon);
+    Packet2->day = htole16(Env->DateTime.tm_mday);
+    Packet2->hour = htole16(Env->DateTime.tm_hour);
+    Packet2->minute = htole16(Env->DateTime.tm_min);
+    Packet2->second = htole16(Env->DateTime.tm_sec);
+    Packet2->baud = 0;
+    Packet2->packetType = htole16(2);
+    Packet2->origNet = htole16(Env->ActiveLocalAKA->Net);
+    Packet2->destNet = htole16(Env->ActiveRemoteAKA->Net);
+    Packet2->prodCode = 0xFE;      /* no allocated product ID */
+    Packet2->serialNo = 0;
+
+    /* empty password (null padded) */
+    for (n = 0; n < 8; n++) Packet2->password[n] = 0;
+
+    Packet2->origZone = htole16(Env->ActiveLocalAKA->Zone);
+    Packet2->destZone = htole16(Env->ActiveRemoteAKA->Zone);
+
+
+    /*
+     *  fill in packet type specific data
+     */
+
+    if (Env->CfgSwitches & SW_TYPE_2PLUS)    /* type-2+ */
     {
-      Flag = True;             /* signal success */
+      Packet2plus = (PacketHeader2plus_Type *)Packet2;
+
+      Packet2plus->Revision_H = VERSION_MAJOR;
+      Packet2plus->Revision_L = VERSION_MINOR;
+
+      /* special treatment if origin is a point */
+      if (Env->ActiveLocalAKA->Point > 0)
+      {
+        Packet2plus->AuxNet = Packet2plus->origNet;
+        Packet2plus->origNet = htole16(-1);
+      }
+
+      Packet2plus->ProductCode_L = 0xFE;     /* no allocated product ID */
+      Packet2plus->ProductCode_H = 0xFE;     /* request one from FTSC? */
+
+      Packet2plus->CapabilWord = htole16(CW_2PLUS);
+      /* copy of Capability Word in reversed byte order (MSB LSB) */
+      Packet2plus->CWvalidationCopy = htobe16(CW_2PLUS);
+
+      Packet2plus->origZone = htole16(Env->ActiveLocalAKA->Zone);
+      Packet2plus->destZone = htole16(Env->ActiveRemoteAKA->Zone);
+      Packet2plus->origPoint = htole16(Env->ActiveLocalAKA->Point);
+      Packet2plus->destPoint = htole16(Env->ActiveRemoteAKA->Point);
+
+      /* product data (null padded) */
+      for (n = 0; n < 4; n++) Packet2plus->ProdData[n] = 0;
+    }
+    else                                     /* type-2 (default) */
+    {
+      /* empty data (null padded) */
+      for (n = 0; n < 20; n++) Packet2->fill[n] = 0;
     }
 
-    free(Packet);            /* free structure */
+
+    /* write packet header */
+    if (fwrite(Packet2, sizeof(PacketHeader2_Type), 1, File) == 1)
+    {
+      Flag = True;            /* signal success */
+    }
+
+    free(Packet2);            /* free structure */
   }
 
   return Flag;
@@ -669,6 +713,7 @@ _Bool WriteNetmailKludges(FILE *File)
 
   Buffer = OutBuffer;
 
+
   /*
    *  INTL <dest zone>:<dest net>/<dest node> <orig zone>:<orig net>/<orig node>
    */
@@ -684,6 +729,7 @@ _Bool WriteNetmailKludges(FILE *File)
   Size += strlen(Buffer);
   Buffer = &(OutBuffer[Size]);
 
+
   /*
    *  FMPT <orig point>
    */
@@ -694,6 +740,7 @@ _Bool WriteNetmailKludges(FILE *File)
     Size += strlen(Buffer);
     Buffer = &(OutBuffer[Size]);
   }
+
 
   /*
    *  TOPT <dest point>
@@ -706,6 +753,7 @@ _Bool WriteNetmailKludges(FILE *File)
     Buffer = &(OutBuffer[Size]);
   }
 
+
   /*
    *  MSGID: <FTS address> <serial number>
    *  serial number: 8 digits, hexadecimal, lower case
@@ -716,6 +764,7 @@ _Bool WriteNetmailKludges(FILE *File)
   Size += strlen(Buffer);
   Buffer = &(OutBuffer[Size]);  
 
+
   /*
    *  CHRS: <identifier> <level>
    *  identifiers for level 2: LATIN-1, ASCII, IBMPC, ... 
@@ -724,6 +773,7 @@ _Bool WriteNetmailKludges(FILE *File)
   snprintf(Buffer, 20, "\001CHRS: LATIN-1 2\r\n");
   Size += strlen(Buffer);
   Buffer = &(OutBuffer[Size]);
+
 
   /*
    *  PID: <pID> <version>[ <serial#>]

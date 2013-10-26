@@ -36,7 +36,9 @@
 
 /* about */
 #define PROJECT          "mfreq"
-#define VERSION          "v3.08"
+#define VERSION          "v3.09"
+#define VERSION_MAJOR    3
+#define VERSION_MINOR    9
 #define COPYRIGHT        "(c) 1994-2013 by Markus Reschke"
 
 /* default paths */
@@ -83,9 +85,11 @@
 /* frequest */
 #define SW_DELETE_REQUEST     4    /* delete request file (.req) */
 #define SW_SEND_NETMAIL       8    /* send respone netmail */
-#define SW_SEND_TEXT         16    /* send response text file */
-#define SW_ANY_CASE          32    /* case-insensitive file matching */
-#define SW_LOG_REQUEST       64    /* extensive logging */
+#define SW_TYPE_2            16    /* packet type-2 */
+#define SW_TYPE_2PLUS        32    /* packet type-2+ */
+#define SW_SEND_TEXT         64    /* send response text file */
+#define SW_ANY_CASE         128    /* case-insensitive file matching */
+#define SW_LOG_REQUEST      256    /* extensive logging */
 
 /* file flags (bitmask, 16 bits) */
 #define FILE_NONE             0    /* no flag set */

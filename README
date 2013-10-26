@@ -1,9 +1,9 @@
 
 ------------------------------------------------------------------------------
 
-                              ReadMe for mfreq suite
+                            ReadMe for mfreq suite
 
-                         (c) 1994-2013 by Markus Reschke
+                       (c) 1994-2013 by Markus Reschke
 
 ------------------------------------------------------------------------------
 
@@ -20,6 +20,7 @@ Features:
   - filenames with spaces
   - magics
   - ifcico-style magic files
+  - smart magics
   - password protected files
   - case-insensitive freqests (if enabled by cfg)
   - request limits
@@ -39,7 +40,7 @@ in the file formats.
 
 * Copyright
 
-All files of the mfreq suite are coprighted by Markus Reschke.
+All files of the mfreq suite are copyrighted by Markus Reschke.
 
 
 * License
@@ -181,7 +182,7 @@ single magic to several files add the same magic for each file.
 A password may be specified optionally to limit access.
 
 
-+ SmartMagic Command (not implemented yet)
++ SmartMagic Command
 
 Syntax:
   SmartMagic <name> Path <path> [Pattern <pattern>] [Latest]
@@ -808,14 +809,15 @@ test environment simply create a pair of fake SRIF and request files.
 + SetMode Setting
 
 Syntax:
-  SetMode [NetMail] [TextMail] [RemoveReq] [AnyCase] [BinarySearch]
-          [LogRequest]
+  SetMode [NetMail] [NetMail+] [TextMail] [RemoveReq] [AnyCase]
+          [BinarySearch] [LogRequest]
 
 With SetMode you enable following features: 
 
   Switch         Feature
   ----------------------------------------
-  NetMail        send response netmail
+  NetMail        send response netmail (type-2 packet, FTS-0001)
+  NetMail+       send response netmail (type-2+ packet, FSC-0048)
   TextMail       send response textmail (plain ASCII file)
   RemoveReq      delete request file after processing
   AnyCase        match file names case-insensitive
@@ -956,7 +958,6 @@ Some stuff which needs to be fixed or would be nice to have:
   - Support of removable media (Index option: [IfMounted <path>])
     by checking /proc/mount?
   - Support Time setting in SRIF file?
-  - Support packet header based on FSC-0039?
 
 
 
@@ -971,6 +972,18 @@ Format of entries in the log file:
 <MMM> <DD> <HH>:<MM>:<SS> <YYYY> [<PID>] <message>
 
 
+* Latest Version
+
+The latest version is available via:
+  - frequest at 2:244/1661 (magic MFREQ)
+  - GIT at sourceforge.net/p/ftnapps/mfreq
+
+
+* Forks & Other OSs
+
+Lars maintains a modfied version for OS X at https://github.com/larsks/mfreq.
+
+
 * Contact the Author
 
   EMail:     madires@theca-tabellaria.de
@@ -982,7 +995,9 @@ Format of entries in the log file:
 A big thank you to:
 
   Paul Quinn, 3:640/384, for beta-testing and some great feature suggestions.
-
+  Rj Clay, 1:120/419, for the GIT repository at sourceforge (FTN
+  Applications).
+  Lars Kellogg-Stedman, 1:322/761, for the OS X version.
 
 
 ------------------------------------ EOF -------------------------------------
