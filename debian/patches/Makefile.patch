@@ -1,0 +1,16 @@
+Description: MFreq Makefile patch for Debian Packaging
+ - Change PREFIX in upstream Makefile to '/usr' for package build.
+Author: Robert James Clay <jame@rocasa.us>
+Last-Update: <2013-10-28>
+
+--- mfreq-3.09.orig/Makefile
++++ mfreq-3.09/Makefile
+@@ -21,7 +21,7 @@ LDFLAGS =
+ LIBS =
+ 
+ # where to install stuff
+-PREFIX = /usr/local
++PREFIX = $$(pwd)/debian/mfreq/usr
+ 
+ # objects
+ OBJ_COMMON = log.o misc.o tokenizer.o
