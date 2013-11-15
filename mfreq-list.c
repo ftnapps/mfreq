@@ -342,8 +342,8 @@ _Bool CloseFilelist()
   Help = GetFilename(Env->ListFilepath);
   if (Help)
   {
-    if (LongLong2ByteString(Env->Bytes, TempBuffer, DEFAULT_BUFFER_SIZE))
-      Log(L_INFO, "Processed %ld files / %sytes for %s.", Env->Files, TempBuffer, Help);
+    if (Bytes2String(Env->Bytes, TempBuffer, DEFAULT_BUFFER_SIZE))
+      Log(L_INFO, "Processed %ld files / %s for %s.", Env->Files, TempBuffer, Help);
   }
 
   /* clean up */
@@ -378,9 +378,9 @@ _Bool CloseFilelist()
 _Bool WriteInfo(FILE *File, Info_Type *Info, Field_Type **Fields, unsigned short Max)
 {
   _Bool             Flag = False;       /* return value */
-  _Bool             Add;                /* control flag */
-  _Bool             Write = True;
-  Field_Type        *Field;
+  _Bool             Add;                /* add flag */
+  _Bool             Write = True;       /* write flag */
+  Field_Type        *Field;             /* data field */
   Field_Type        *DescField = NULL;
   Token_Type        *Text;
   char              *Buffer;            /* virtual buffer */
@@ -389,7 +389,7 @@ _Bool WriteInfo(FILE *File, Info_Type *Info, Field_Type **Fields, unsigned short
   size_t            LineSize;           /* length of current line */
   size_t            Length;             /* string length */
   int               Diff;
-  int               Spaces;
+  int               Spaces;             /* number of spaces */
   struct tm         *DateTime;
   unsigned short    Counter = 1;        /* line number */
 
@@ -397,7 +397,7 @@ _Bool WriteInfo(FILE *File, Info_Type *Info, Field_Type **Fields, unsigned short
   if ((File == NULL) || (Info == NULL) ||
       (Fields == NULL)) return Flag;
 
-  Flag = True;
+  Flag = True;           /* success by default :-) */
 
 
   /*
@@ -442,20 +442,8 @@ _Bool WriteInfo(FILE *File, Info_Type *Info, Field_Type **Fields, unsigned short
     }
     else if (Field->Type == FIELD_SIZE)     /* size */
     {
-      if (Field->Format == FIELD_FORM_BYTES)
-      {
-        /* limit digits to width */
-        Value = LimitNumber(Info->Size, Field->Width);
-
-        snprintf(InBuffer, DEFAULT_BUFFER_SIZE - 1,
-          "%*lld", Field->Width, Value);
-        Add = True;       
-      }
-      else if (Field->Format == FIELD_FORM_UNIT)
-      {
-        Add = Bytes2String(Info->Size, Field->Width, InBuffer,
-                           DEFAULT_BUFFER_SIZE - 1);
-      }
+      Add = Bytes2StringN(Info->Size, Field->Width, Field->Format,
+        InBuffer, DEFAULT_BUFFER_SIZE - 1);
     }
     else if (Field->Type == FIELD_DATE)     /* date */
     {
@@ -589,18 +577,18 @@ _Bool WriteInfo(FILE *File, Info_Type *Info, Field_Type **Fields, unsigned short
   /* check for multiline mode */
   if (Write && DescField && (DescField->Format & FIELD_FORM_MULTI))
   {
-    /* skip first line */
+    /* skip first line since it's already written */
     Text = Info->Infos;
     if (Text) Text = Text->Next;
  
-    while (Text)
+    while (Text)              /* loop through remaining lines */
     {
       /* reset variables */
       Buffer = OutBuffer;
       Buffer[0] = 0;
       LineSize = 0;
 
-      if (Text->String)
+      if (Text->String)       /* sanity check */
       {
         /* take care about start position */
         Spaces = DescField->Pos - 1;
@@ -611,18 +599,20 @@ _Bool WriteInfo(FILE *File, Info_Type *Info, Field_Type **Fields, unsigned short
         /* add description */
         snprintf(Buffer, DEFAULT_BUFFER_SIZE - 1 - LineSize, "%s", Text->String);
 
-        /* width overflow */
+        /* prevent width overflow */
         Length = strlen(Buffer);
         Diff = Max - DescField->Pos;
-        if (Length > Diff)
+        if (Length > Diff)              /* too long */
         {
           if ((Diff > 1) && (Diff < DEFAULT_BUFFER_SIZE - 1))    /* sanity check */
           {
+            /* truncate line */
             Buffer[Diff] = 0;
             Buffer[Diff - 1] = '~'; 
           }
         }
 
+        /* write line */
         fprintf(File, "%s\n", OutBuffer);
       }
 
@@ -651,17 +641,17 @@ _Bool WriteInfo(FILE *File, Info_Type *Info, Field_Type **Fields, unsigned short
 _Bool Parse_files_bbs(char *Buffer, unsigned int Line, Info_Type **CurrentInfo)
 {
   _Bool             Flag = False;       /* return value */
-  _Bool             Skip = False;       /* control flag */
-  unsigned short    Pos;
-  unsigned short    NewPos;
-  unsigned short    Width;
-  unsigned short    Length;
+  _Bool             Skip = False;       /* skip flag */
+  unsigned short    Pos;                /* position in string */
+  unsigned short    NewPos;             /* new position in string */
+  unsigned short    Width;              /* sub-string width */
+  unsigned short    Length;             /* sub-string width */
   long long         Value;              /* twice as long as off_t */
-  char              *Str;
-  char              *Data;
-  char              *NewData;
-  Info_Type         *Info;
-  Field_Type        *Field;
+  char              *Str;               /* support string pointer */
+  char              *Data;              /* data sub-string */
+  char              *NewData;           /* new data sub-string */
+  Info_Type         *Info;              /* fileinfo element */
+  Field_Type        *Field;             /* data field element */
   time_t            UnixTime;
   struct tm         DateTime;
 
@@ -678,7 +668,7 @@ _Bool Parse_files_bbs(char *Buffer, unsigned int Line, Info_Type **CurrentInfo)
    *  additional description line
    */
 
-  if (Data[0] == ' ')
+  if (Data[0] == ' ')         /* line starts with space */
   {
     if (*CurrentInfo != NULL)     /* if ok */
     {
@@ -690,7 +680,10 @@ _Bool Parse_files_bbs(char *Buffer, unsigned int Line, Info_Type **CurrentInfo)
       }
 
       /* check for string end */
-      if (Data[0] == 0) Flag = False;
+      if (Data[0] == 0)
+      {
+        Flag = False;
+      }
 
       /* check position if strict checking is enabled */
       else if (Env->InfoMode & INFO_STRICT)
@@ -740,7 +733,7 @@ _Bool Parse_files_bbs(char *Buffer, unsigned int Line, Info_Type **CurrentInfo)
         {
           Skip = True;
         }
-        /* otherwise report systax problem */
+        /* otherwise report syntax problem */
         else
         {
           Flag = False;
@@ -864,12 +857,11 @@ _Bool Parse_files_bbs(char *Buffer, unsigned int Line, Info_Type **CurrentInfo)
         {
           Flag = False;
         }
-        else if ((Field->Format == FIELD_FORM_BYTES) ||
-                 (Field->Format == FIELD_FORM_UNIT))
+        else                         /* take any format as input */
         {
-          Value = ByteString2LongLong(Data);
+          Value = String2Bytes(Data);        /* convert string */
 
-          if (Value >= 0)   /* valid */
+          if (Value >= 0)   /* valid size */
           {
             if (Info->Status & STAT_NOT_FOUND)   /* no value set yet */
             {
@@ -880,7 +872,7 @@ _Bool Parse_files_bbs(char *Buffer, unsigned int Line, Info_Type **CurrentInfo)
               Info->Status |= STAT_CHANGED;
             }
           }
-          else              /* invalid */
+          else              /* invalid size */
           {
             Flag = False;
           }
@@ -1082,8 +1074,15 @@ _Bool Read_files_bbs(char *Path)
           /* if it's not an empty line */
           if (InBuffer[0] != 0)
           {
+            /* parse line and extract data fields */
             Flag = Parse_files_bbs(InBuffer, Line, &Info);
-            if (!Flag) Run = False;        /* end loop */ 
+
+            /* if we care about for syntax errors */
+            if (!(Env->InfoMode & INFO_RELAX))
+            {
+              /* end processing on error */
+              if (!Flag) Run = False;        /* end loop */ 
+            }
           }
         }
       }
@@ -1777,6 +1776,11 @@ _Bool Cmd_Define_files_bbs(Token_Type *TokenList)
             SizeFormat = FIELD_FORM_UNIT;
             SizeWidth = 8;
           }
+          else if (strcasecmp(TokenList->String, "Short-8") == 0)
+          {
+            SizeFormat = FIELD_FORM_SHORT;
+            SizeWidth = 8;
+          }
           else Run = False;       /* unknown keyword */
           break;
 
@@ -2037,6 +2041,10 @@ _Bool Cmd_Define_filelist(Token_Type *TokenList)
           else if (strcasecmp(TokenList->String, "Unit") == 0)
           {
             SizeFormat = FIELD_FORM_UNIT;
+          }
+          else if (strcasecmp(TokenList->String, "Short") == 0)
+          {
+            SizeFormat = FIELD_FORM_SHORT;
           }
           else Run = False;       /* unknown keyword */
           break;
@@ -2745,6 +2753,7 @@ _Bool Cmd_Reset(Token_Type *TokenList)
 /*
  *  file info mode
  *  Syntax: InfoMode [dir.bbs] [files.bbs] [Update] [Strict] |Skips]
+ *                   [Relax] [SI-Units] [IEC-Units]
  *
  *  returns:
  *  - 1 on success
@@ -2757,8 +2766,10 @@ _Bool Cmd_InfoMode(Token_Type *TokenList)
   _Bool                  Run = True;         /* control flag */
   unsigned short         Keyword = 0;        /* keyword ID */
   unsigned short         Mode = INFO_NONE;
-  static char            *Keywords[7] =
-    {"InfoMode", "dir.bbs", "files.bbs", "Update", "Strict", "Skips", NULL};
+  unsigned short         Switches = SW_NONE;
+  static char            *Keywords[10] =
+    {"InfoMode", "dir.bbs", "files.bbs", "Update", "Strict",
+     "Skips", "Relax", "SI-Units", "IEC-Units", NULL};
 
   /* sanity check */
   if (TokenList == NULL) return Flag;
@@ -2805,6 +2816,19 @@ _Bool Cmd_InfoMode(Token_Type *TokenList)
 
       case 6:       /* skips */
         Mode |= INFO_SKIPS;
+        break;
+
+      case 7:       /* relax */
+        Mode |= INFO_RELAX;
+        break;
+
+      case 8:       /* SI units */
+        Switches |= SW_SI_UNITS;
+        break;
+
+      case 9:       /* IEC units for output */
+        Switches |= SW_IEC_UNITS;
+        break;
     }
 
     TokenList = TokenList->Next;     /* goto to next token */
@@ -2815,13 +2839,16 @@ _Bool Cmd_InfoMode(Token_Type *TokenList)
    *  check parser results
    */
 
-  if (Run == False)
+  if (Run == False)           /* error */
   {
     LogCfgError();
   }
-  else
+  else                        /* success */
   {
-    Env->InfoMode = Mode;
+    Env->InfoMode = Mode;               /* set new infomode */
+    /* unset bits for local switches */
+    Env->CfgSwitches &= ~(SW_SI_UNITS | SW_IEC_UNITS);
+    Env->CfgSwitches |= Switches;       /* update switches */
     Flag = True;
   }
 
@@ -3382,6 +3409,9 @@ _Bool GetAllocations(void)
     Env->ConfigDepth = 0;
     Env->CfgInUse = NULL;
     Env->CfgLinenumber = 0;
+
+    /* environment: common configuration */
+    Env->CfgSwitches = SW_NONE;
 
     /* environment: file index */
     Env->ExcludeList = NULL;

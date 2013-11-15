@@ -478,7 +478,7 @@ Syntax:
 
 The command above defines the format of the files.bbs description file. It
 tells mfreq-list which data fields are used. Each call will reset all settings
-of the last call.
+of the last call. The format definition is used for reading and writing.
 
 For all arguments the <pos> value is the position of the data field, starting
 with 1 for the first character (valid range: 1-120). A position of 40 means
@@ -490,7 +490,7 @@ Arguments:
   Defines file name format.
 
   format  description
-  -----------------------------------------
+  --------------------------------------------------
   DOS     8.3 DOS style
   Long    full name (you need to set NameWidth too!)
 
@@ -502,29 +502,36 @@ Arguments:
   * SizePos <pos> SizeFormat <format>
   Enables file size field. Defines start position and format.
 
-  format   description
-  -----------------------------------------
-  Bytes-8  number of bytes, max. 8 digits
-  Unit-8   bytes with unit, max. 8 digits/chars
+  format   description                         examples
+  ---------------------------------------------------------
+  Bytes-8  bytes without unit, max. 8 digits   1234
+  Unit-8   bytes with unit, max. 8 chars       12kB, 12KiB
+  Short-8  bytes with short unit, max. chars   12k
 
   The size field is right-justified! So take care when defining the position!
+  Leading zeros are omitted. When reading a files.bbs file mfreq-list accepts
+  any valid format, not just the one you've set.
+
 
   * DatePos <pos> DateFormat <format>
   Enables file date field. Defines start position and format.
 
-  format    description
-  -----------------------------------------
-  US        MM-DD-YY
-  ISO       YYYY-MM-DD
+  format    description   examples
+  -----------------------------------
+  US        MM-DD-YY      04-20-13
+  ISO       YYYY-MM-DD    2013-04-20
 
   * CounterPos <pos> CounterFormat <format>
   Enables download counter field. Defines start position and format.
 
-  format    description
-  -----------------------------------------
-  Square-2  [nn]
-  Square-3  [nnn]  
-  Square-4  [nnnn]  
+  format    description   examples
+  ----------------------------------
+  Square-2  [nn]          [12], [7]
+  Square-3  [nnn]         [345]
+  Square-4  [nnnn]        [6789]
+
+  The counter field is right-justified! So take care when defining the
+  position! Leading zeros are omitted.
 
   * DescPos <pos>
   Sets start position of file description.
@@ -560,36 +567,41 @@ If you set NamePos to 2-<pos> an empty line is added before the file name.
   Position (range: 1 - 120), width (range: 12 - 60) and format of file name:
 
   format  description
-  -----------------------------------------
+  ---------------------------------------------------
   DOS     8.3 DOS style
   Long    full name (you need to set NameWidth too!)  
 
   * SizePos <line-pos> SizeWith <width> SizeFormat <format>
   Position (range: 1 - 120), width (range: 4 - 12) and format of file size:
 
-  format  description
-  -----------------------------------------
-  Bytes   number of bytes
-  Unit    bytes with unit
+  format  description             examples
+  --------------------------------------------
+  Bytes   bytes without unit      1234
+  Unit    bytes with unit         12kB, 12KiB
+  Short   bytes with short unit   12k
 
   The size field is right-justified! So take care when defining the position!
+  Leading zeros are omitted.
 
   * DatePos <line-pos> DateFormat <format>
   Position (range: 1 - 120) and format of file date:
 
-  format    description
-  -----------------------------------------
-  US        MM-DD-YY
-  ISO       YYYY-MM-DD
+  format    description   examples
+  -----------------------------------
+  US        MM-DD-YY      04-20-13
+  ISO       YYYY-MM-DD    2013-04-20
 
   * CounterPos <line-pos> CounterFormat <format>
   Position (range: 1 - 120) and format of download counter:
 
-  format    description
-  -----------------------------------------
-  Square-2  [nn]
-  Square-3  [nnn]  
-  Square-4  [nnnn]
+  format    description   examples
+  ----------------------------------
+  Square-2  [nn]          [12], [7]
+  Square-3  [nnn]         [345]
+  Square-4  [nnnn]        [6789]
+
+  The counter field is right-justified! So take care when defining the
+  position! Leading zeros are omitted.
 
   * DescPos <line-pos> DescWidth <width>
     Position (range: 1 - 120) and width (range: 18-80) of description field.
@@ -598,15 +610,19 @@ If you set NamePos to 2-<pos> an empty line is added before the file name.
 + InfoMode Command
 
 Syntax:
-  InfoMode [dir.bbs] [files.bbs] [Update] [Strict] [Skips]
+  InfoMode [dir.bbs] [files.bbs] [Update] [Strict] [Skips] [Relax] [SI-Units]
 
-Switches:
-  - dir.bbs     enables use of dir.bbs/DIR.BBS
-  - files.bbs   enables use of files.bbs/FILES.BBS
-  - Update      enables update of file description file
-  - Strict      enables strict syntax checking
-  - Skips       allows missing data fields
-
+  Switch      Feature
+  -------------------------------------------------------
+  dir.bbs     enable use of dir.bbs/DIR.BBS
+  files.bbs   enable use of files.bbs/FILES.BBS
+  Update      enable update of file description file
+  Strict      enable strict position checking for data fields
+  Skips       allow missing data fields behind filename
+  Relax       don't end processing of file description file on
+              syntax errors       
+  SI-Units    enable SI byte units
+  IEC-Units   enable IEC byte units output
 
 With InfoMode you set the source of file descriptions. When you enable
 files.bbs, you have to define it's format with the "Define files.bbs" command.
@@ -614,9 +630,18 @@ files.bbs, you have to define it's format with the "Define files.bbs" command.
 If you want mfreq-list to update the description file, e.g. removing deleted
 files, set the Update switch.
 
-For strict syntax checking of the file description files set the Strict switch,
-i.e. all defined data fields must exist and their positions must match exactly.
-The Skips switch allows missing data fields (premature end of line).
+For strict position checking set the Strict switch, i.e. the start and end
+positions of the defined data fields must match exactly. The Skips switch
+allows missing data fields behind the filename (premature end of line). With
+Relax set mfreq-list ignores syntax/format errors in file description files
+and keeps processing. So you'll get a filelist in any case. But be warned that
+the Relax switch may cause a lot of warnings being logged. If you set Relax
+and Update you can convert file descriptions files into the desired format. 
+
+The SI-Units switch enables metric unit prefixes for any input and output, i.e.
+1 kB = 1000 Bytes. By default the binary prefix system is used. The IEC-Units
+switch enables output of the IEC prefix recommendations (1024 Bytes = 1 KiB)
+and overrides the SI-Units switch for output.
 
 
 + Reset Command
@@ -810,7 +835,7 @@ test environment simply create a pair of fake SRIF and request files.
 
 Syntax:
   SetMode [NetMail] [NetMail+] [TextMail] [RemoveReq] [AnyCase]
-          [BinarySearch] [LogRequest]
+          [BinarySearch] [LogRequest] [SI-Units] [IEC-Units]
 
 With SetMode you enable following features: 
 
@@ -823,6 +848,8 @@ With SetMode you enable following features:
   AnyCase        match file names case-insensitive
   BinarySearch   enable binary filename search
   LogRequest     log file requests in more detail
+  SI-Units       enable SI byte units
+  IEC-Units      enable IEC byte units output  
 
 Please set the RemoveReq switch if your mailer doesn't delete the request file
 after calling the frequest handler.
@@ -833,6 +860,11 @@ speed up the processing of file requests.
 
 With LogRequest set mfreq-srif logs which files are requested and which are  
 going to be sent.
+
+The SI-Units switch enables metric unit prefixes for any input and output, i.e.
+1 kB = 1000 Bytes. By default the binary prefix system is used. The IEC-Units
+switch enables output of the IEC prefix recommendations (1024 Bytes = 1 KiB)
+and overrides the SI-Units switch for output.
 
 
 + Address Setting
@@ -905,7 +937,7 @@ Some examples:
   -----------------------------------------------------------
   ?:*              any system in a zone with one digit
   2:*              any system in zone 2
-  2:244/*          any system in zone 2 and net 244
+  2:240/*          any system in zone 2 and net 240
   *@fidonet        any system in domain fidonet
   *                any system (for a rule of last resort)
 
@@ -914,9 +946,12 @@ the Bytes argument defines the maximum number of bytes allowed. Both values
 should be in the range of 0 to 2147483000 (2^31 - 1). Zero means "none". 
 
 For the byte value you may use following units:
-  - kB for kilo Bytes (kiB)
-  - MB for Mega Bytes (MiB)
-  - GB for Giga Bytes (GiB)
+  - kB for kilobytes (binary in default mode, decimal if SI units are enabled)
+  - MB for megabytes (binary in default mode, decimal if SI units are enabled)
+  - GB for gigabytes (binary in default mode, decimal if SI units are enabled)
+  - KiB for kibibytes
+  - MiB for mebibytes
+  - GiB for gibibytes
 
 Place the unit directly behind the value or enclose the term in quotation
 marks if you insert a space:
@@ -975,7 +1010,7 @@ Format of entries in the log file:
 * Latest Version
 
 The latest version is available via:
-  - frequest at 2:244/1661 (magic MFREQ)
+  - frequest at 2:240/1661 (magic MFREQ)
   - GIT at sourceforge.net/p/ftnapps/mfreq
 
 
@@ -987,7 +1022,7 @@ Lars maintains a modfied version for OS X at https://github.com/larsks/mfreq.
 * Contact the Author
 
   EMail:     madires@theca-tabellaria.de
-  Netmail:   Markus Reschke 2:244/1661
+  Netmail:   Markus Reschke 2:240/1661
 
 
 * Credits

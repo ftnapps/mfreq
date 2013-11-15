@@ -543,8 +543,8 @@ void LogRequest()
       {
         if (Response->Status & STAT_OK)      /* valid file */
         {
-          if (LongLong2ByteString(Response->Size, TempBuffer, DEFAULT_BUFFER_SIZE - 1))
-            Log(L_INFO, "Responded: %s (%sytes)", Help, TempBuffer);
+          if (Bytes2String(Response->Size, TempBuffer, DEFAULT_BUFFER_SIZE - 1))
+            Log(L_INFO, "Responded: %s (%s)", Help, TempBuffer);
         }
       }
 
@@ -872,8 +872,9 @@ _Bool ActivateLimits()
   /* log limits */
   if (Env->ActiveLimit)
   {
-    Log(L_INFO, "Limits used: %ld files / %lld bytes (unlimited: -1)",
-      Env->ActiveLimit->Files, Env->ActiveLimit->Bytes);
+    if (Bytes2String(Env->ActiveLimit->Bytes, TempBuffer, DEFAULT_BUFFER_SIZE))
+      Log(L_INFO, "Limits used: %ld files / %s (unlimited: -1)",
+          Env->ActiveLimit->Files, TempBuffer);
   }
 
   return Flag;
@@ -2007,7 +2008,7 @@ _Bool Add_Limit(Token_Type *TokenList)
           break;
 
         case 3:     /* bytes */
-          Bytes = ByteString2LongLong(TokenList->String);
+          Bytes = String2Bytes(TokenList->String);
           if (Bytes < 0) Run = False;
       }
 
@@ -2389,7 +2390,7 @@ _Bool Add_AKA(Token_Type *TokenList)
 /*
  *  set mode
  *  Syntax: SetMode [NetMail] [TextMail] [RemoveReq] [AnyCase]
- *                  [BinarySearch] [LogRequest]
+ *                  [BinarySearch] [LogRequest] [SI-Units]
  *
  *  returns:
  *  - 1 on success
@@ -2401,9 +2402,9 @@ _Bool Set_Mode(Token_Type *TokenList)
   _Bool                  Flag = False;       /* return value */
   _Bool                  Run = True;         /* control flag */
   unsigned short         Keyword = 0;        /* keyword ID */
-  static char            *Keywords[9] =
+  static char            *Keywords[11] =
     {"SetMode", "NetMail", "NetMail+", "TextMail", "RemoveReq",
-     "AnyCase", "BinarySearch", "LogRequest", NULL};
+     "AnyCase", "BinarySearch", "LogRequest", "SI-Units", "IEC-Units", NULL};
 
   /* sanity check */
   if (TokenList == NULL) return Flag;
@@ -2453,6 +2454,14 @@ _Bool Set_Mode(Token_Type *TokenList)
 
       case 8:       /* log request */
         Env->CfgSwitches |= SW_LOG_REQUEST;
+        break;
+
+      case 9:       /* SI units */
+        Env->CfgSwitches |= SW_SI_UNITS;
+        break;
+
+      case 10:      /* IEC units for output */
+        Env->CfgSwitches |= SW_IEC_UNITS;
         break;
     }
 
@@ -3260,8 +3269,8 @@ int main(int argc, char *argv[])
       else if (Env->FreqStatus & STAT_BYTELIMIT)
         Log(L_INFO, "byte limit exceeded");
 
-      if (LongLong2ByteString(Env->Bytes, TempBuffer, DEFAULT_BUFFER_SIZE))
-        Log(L_INFO, "Totals: %ld files / %sytes", Env->Files, TempBuffer);
+      if (Bytes2String(Env->Bytes, TempBuffer, DEFAULT_BUFFER_SIZE))
+        Log(L_INFO, "Totals: %ld files / %s", Env->Files, TempBuffer);
     }
   }
 
