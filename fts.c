@@ -558,7 +558,7 @@ _Bool WritePacketHeader(FILE *File)
       }
 
       Packet2plus->ProductCode_L = 0xFE;     /* no allocated product ID */
-      Packet2plus->ProductCode_H = 0xFE;     /* request one from FTSC? */
+      Packet2plus->ProductCode_H = 0x00;     /* request one from FTSC? */
 
       Packet2plus->CapabilWord = htole16(CW_2PLUS);
       /* copy of Capability Word in reversed byte order (MSB LSB) */
@@ -879,9 +879,9 @@ _Bool WriteMailContent(FILE *File)
         {
           if (Response->Status & STAT_OK)       /* valid file */
           {
-            if (LongLong2ByteString(Response->Size, TempBuffer, DEFAULT_BUFFER_SIZE - 1))
+            if (Bytes2String(Response->Size, TempBuffer, DEFAULT_BUFFER_SIZE - 1))
               snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
-                "  - %s (%sytes)\r\n", Help, TempBuffer);
+                "  - %s (%s)\r\n", Help, TempBuffer);
             else
               snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
                 "  - %s (%ld Bytes)\r\n", Help, Response->Size);
@@ -926,12 +926,12 @@ _Bool WriteMailContent(FILE *File)
   snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
     "  - %ld files\r\n", Env->Files);
   fputs(OutBuffer, File);
-  if (LongLong2ByteString(Env->Bytes, TempBuffer, DEFAULT_BUFFER_SIZE - 1))
+  if (Bytes2String(Env->Bytes, TempBuffer, DEFAULT_BUFFER_SIZE - 1))
     snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
-      "  - %sytes\r\n", TempBuffer);
+      "  - %s\r\n", TempBuffer);
   else
     snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
-      "  - %lld bytes\r\n", Env->Bytes); 
+      "  - %lld Bytes\r\n", Env->Bytes); 
   fputs(OutBuffer, File);
 
 

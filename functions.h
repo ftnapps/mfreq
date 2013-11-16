@@ -34,8 +34,8 @@
 
   extern char *CopyString(const char *Source);
   extern long Str2Long(const char *Token);
-  extern _Bool LongLong2ByteString(long long Bytes, char *Buffer, size_t Size);
-  extern long long ByteString2LongLong(char *Token);
+  extern _Bool Bytes2String(long long Bytes, char *Buffer, size_t Size);
+  extern long long String2Bytes(char *Token);
 
   extern _Bool MatchPattern(char *String, char *Pattern);
 
@@ -154,12 +154,14 @@
     unsigned short Pos, unsigned short Width,
     unsigned short Align, unsigned short Format);
 
-  extern _Bool Strings2DateTime(char *Year, char *Month, char *Day, struct tm *DateTime);
+  extern _Bool Strings2DateTime(char *Year, char *Month, char *Day,
+    struct tm *DateTime);
 
   extern void FillString(char *String, char Char,
     unsigned short Number, unsigned short Max);
   extern long long LimitNumber(long long Number, unsigned short Digits);
-  extern _Bool Bytes2String(long long Bytes, int Width, char *Buffer, size_t Size);
+  extern _Bool Bytes2StringN(long long Bytes, unsigned short Width,
+    unsigned short Format, char *Buffer, size_t Size);
 
   extern _Bool CheckDosFilename(char* Name);
 

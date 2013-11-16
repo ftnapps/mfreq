@@ -17,11 +17,13 @@
  *  include header files
  */
 
-
 /* local header files */
 #include "common.h"           /* common stuff */
 #include "variables.h"        /* global variables */
 #include "functions.h"        /* external functions */
+
+/* string stuff */
+#include <ctype.h>
 
 
 
@@ -47,7 +49,7 @@ char *CopyString(const char *Source)
   Destination = malloc(strlen(Source) + 1);    /* get memory */
   if (Destination == NULL)
   {
-    Log(L_ERR, "No memory!\n");
+    Log(L_ERR, "No memory!");
   }
   else
   {
@@ -90,49 +92,87 @@ long Str2Long(const char *Token)
 /*
  *  convert long long integer into string with byte unit
  *
+ *  requires:
+ *  - number of bytes
+ *  - pointer to string buffer
+ *  - size of string buffer
+ *
  *  returns:
  *  - 1 on success
  *  - 0 on any problem
  */
 
-_Bool LongLong2ByteString(long long Bytes, char *Buffer, size_t Size)
+_Bool Bytes2String(long long Bytes, char *Buffer, size_t Size)
 {
-  _Bool                Flag = False;             /* return value */
-  unsigned int         Counter = 0;
-  char                 Unit;
+  _Bool             Flag = False;            /* return value */
+  unsigned int      Counter = 0;
+  _Bool             SI_Flag = False;         /* decimal/binary flag */
+  _Bool             IEC_Flag = False;        /* IEC units */ 
+  char              Prefix[3] = {0, 0, 0};   /* prefix */
+
 
   /* sanity checks */
-  if ((Buffer == NULL) || (Size < 10)) return Flag;
+  if ((Buffer == NULL) || (Size < 12)) return Flag;
 
-  /* break down large value */
-  while (Bytes > 10240)
+  /* check for use of SI units */
+  if (Env->CfgSwitches & SW_SI_UNITS) SI_Flag = True;
+
+  /* check for use of IEC units */
+  if (Env->CfgSwitches & SW_IEC_UNITS)
   {
-    Bytes = Bytes / 1024;
-    Counter++;
+    IEC_Flag = True;
+    SI_Flag = False;     /* IEC units imply binary factor */
   }
 
-  /* unit */
+  /* scale down large value */
+  if (SI_Flag)                /* use 1000 */
+  {
+    while (Bytes > 10000)
+    {
+      Bytes = Bytes / 1000;        /* scale by 1000 */
+      Counter++;                   /* increase factor */
+    }
+  }
+  else                        /* use 1024 */
+  {
+    while (Bytes > 10240)
+    {
+      Bytes = Bytes / 1024;        /* scale by 1024 */
+      Counter++;                   /* increase factor */
+    }
+  }
+
+  /* prefix */
   switch (Counter)
   {
     case 1:
-      Unit = 'k';
+      if (IEC_Flag) Prefix[0] = 'K'; 
+      else Prefix[0] = 'k';
       break;
+
     case 2:
-      Unit = 'M';
+      Prefix[0] = 'M';
       break;
+
     case 3:
-      Unit = 'G';
+      Prefix[0] = 'G';
       break;
   }
 
-  /* build string */
-  if (Counter > 0)     /* with unit */
-  { 
-    if (snprintf(Buffer, 10, "%lld %cB", Bytes, Unit) > 0) Flag = True;
-  }
-  else                 /* no unit */
+  if (IEC_Flag)          /* KiB etc. */
   {
-    if (snprintf(Buffer, 10, "%lld B", Bytes) > 0) Flag = True;
+    Prefix[1] = 'i';               /* add "i" */
+  }
+
+  /* build string */
+  if (Counter > 0)     /* with prefix and unit */
+  { 
+    if (snprintf(Buffer, 10, "%lld %sB", Bytes, &Prefix[0]) > 0) Flag = True;
+  }
+  else                 /* without prefix, just bytes */
+  {
+    /* we write "Bytes" instead of just "B", seems nicer */
+    if (snprintf(Buffer, 12, "%lld Bytes", Bytes) > 0) Flag = True;
   }
 
   return Flag;
@@ -144,16 +184,19 @@ _Bool LongLong2ByteString(long long Bytes, char *Buffer, size_t Size)
  *  convert string with number and byte unit into long long integer
  *
  *  returns:
- *  - value on success
+ *  - byte value on success
  *  - -2 on any problem
  */
 
 
-long long ByteString2LongLong(char *Token)
+long long String2Bytes(char *Token)
 {
   long long         Bytes = -2;         /* return value */
-  long              Value;
+  long              Value;              /* number */
+  size_t            Length;             /* string length */
   char              *Test = NULL;       /* test pointer */
+  char              Prefix;             /* unit prefix */
+  _Bool             SI_Flag = False;    /* decimal/binary flag */
 
   /* sanity check */
   if (Token == NULL) return Bytes;
@@ -171,38 +214,75 @@ long long ByteString2LongLong(char *Token)
     {
       /* no work to be done */
     }
-    else if (Test[0] == 0)           /* got valid value */
+    else if (Test[0] == 0)           /* got valid value (i.e no unit) */
     {
-      /* just digits, no unit */
-      Bytes = Value;
+      Bytes = Value;                 /* just digits, no unit */
     }
-    else                             /* unit follows */
+    else                             /* value plus unit */
     {
+      /*
+       *  get prefix of unit
+       */
+
       /* skip whitespaces */
       while ((Test[0] == ' ') || (Test[0] == '\t'))
       {
         Test++;
       }
 
-      /* get unit */
-      if (strlen(Test) == 2)           /* 2 chars left */
+      /* check for use of SI units */
+      if (Env->CfgSwitches & SW_SI_UNITS) SI_Flag = True;
+
+      Length = strlen(Test);       /* length of remaining string */
+      Prefix = toupper(Test[0]);   /* assumed prefix */
+      Test++;                      /* skip first char */
+
+      /* check syntax */
+      if (Length == 1)             /* k etc. */
       {
-        /* if second char is a "B" for bytes */
-        if ((Test[1] == 'b') || (Test[1] == 'B'))
+        /* special case: "B" for bytes */
+        if (Prefix == 'B')
         {
-          /* then the first char is the multiplier */
-          switch (Test[0])
-          {
-            case 'k':
-              Bytes = Value * 1024;
-              break;
-            case 'M':
-              Bytes = Value * 1024 * 1024;
-              break;
-            case 'G':
-              Bytes = Value * 1024 * 1024 * 1024;
-              break;
-          }
+          Bytes = Value;           /* no prefix */
+          Prefix = 0;              /* reset prefix */
+        }
+      }
+      else if (Length == 2)        /* kB etc. */
+      {
+        /* check for "B" */
+        if (strcasecmp(Test, "B") != 0) Prefix = 0;
+      }
+      else if (Length == 3)        /* KiB etc. */
+      {
+        /* check for "iB" */
+        if (strcasecmp(Test, "iB") != 0) Prefix = 0;
+
+        SI_Flag = False;           /* IEC unit implies binary */
+      }
+      else                         /* something else */
+      {
+        Prefix = 0;
+      }
+
+      /* manage multiplicator */
+      if (Prefix > 0)              /* got prefix */
+      {
+        switch(Prefix)
+        {
+          case 'K':
+            if (SI_Flag) Bytes = Value * 1000;
+            else Bytes = Value * 1024;
+            break;
+
+          case 'M':
+            if (SI_Flag) Bytes = Value * 1000000;
+            else Bytes = Value * 1024 * 1024;
+            break;
+
+          case 'G':
+            if (SI_Flag) Bytes = Value * 1000000000;
+            else Bytes = Value * 1024 * 1024 * 1024;
+            break;
         }
       }
     }

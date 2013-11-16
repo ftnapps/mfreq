@@ -36,9 +36,9 @@
 
 /* about */
 #define PROJECT          "mfreq"
-#define VERSION          "v3.09"
+#define VERSION          "v3.10"
 #define VERSION_MAJOR    3
-#define VERSION_MINOR    9
+#define VERSION_MINOR    10
 #define COPYRIGHT        "(c) 1994-2013 by Markus Reschke"
 
 /* default paths */
@@ -78,54 +78,58 @@
 
 /* cfg switches (bitmask, 16 bits) */
 /* common */
-#define SW_NONE               0    /* no switch set */
-#define SW_BINARY_SEARCH      1    /* binary search */
+#define SW_NONE               0b0000000000000000  /* no switch set */
+#define SW_BINARY_SEARCH      0b0000000000000001  /* binary search */
+#define SW_SI_UNITS           0b0000000000000010  /* enable SI units (input) */
+#define SW_IEC_UNITS          0b0000000000000100  /* enable IEC units (output) */
 /* index */
-#define SW_PATH_ALIASES       2    /* create path aliases */
+#define SW_PATH_ALIASES       0b0000000000010000  /* create path aliases */
 /* frequest */
-#define SW_DELETE_REQUEST     4    /* delete request file (.req) */
-#define SW_SEND_NETMAIL       8    /* send respone netmail */
-#define SW_TYPE_2            16    /* packet type-2 */
-#define SW_TYPE_2PLUS        32    /* packet type-2+ */
-#define SW_SEND_TEXT         64    /* send response text file */
-#define SW_ANY_CASE         128    /* case-insensitive file matching */
-#define SW_LOG_REQUEST      256    /* extensive logging */
+#define SW_DELETE_REQUEST     0b0000000100000000  /* delete request file (.req) */
+#define SW_SEND_NETMAIL       0b0000001000000000  /* send respone netmail */
+#define SW_TYPE_2             0b0000010000000000  /* packet type-2 */
+#define SW_TYPE_2PLUS         0b0000100000000000  /* packet type-2+ */
+#define SW_SEND_TEXT          0b0001000000000000  /* send response text file */
+#define SW_ANY_CASE           0b0010000000000000  /* case-insensitive file matching */
+#define SW_LOG_REQUEST        0b0100000000000000  /* extensive logging */
+
+
 
 /* file flags (bitmask, 16 bits) */
-#define FILE_NONE             0    /* no flag set */
-#define FILE_SKIP             1    /* skip file */
+#define FILE_NONE             0b0000000000000000  /* no flag set */
+#define FILE_SKIP             0b0000000000000001  /* skip file */
 
 /* frequest flags (bitmask, 16 bits) */
-#define REQ_NONE              0    /* no flag set */
-#define REQ_PROTECTED         1    /* protected FTS session */
-#define REQ_UNPROTECTED       2    /* unprotected FTS session */
-#define REQ_LISTED            4    /* listed system */
-#define REQ_UNLISTED          8    /* unlisted system */
+#define REQ_NONE              0b0000000000000000  /* no flag set */
+#define REQ_PROTECTED         0b0000000000000001  /* protected FTS session */
+#define REQ_UNPROTECTED       0b0000000000000010  /* unprotected FTS session */
+#define REQ_LISTED            0b0000000000000100  /* listed system */
+#define REQ_UNLISTED          0b0000000000001000  /* unlisted system */
 
 /* file status (bitmask, 16 bits) */
 /* common */
-#define STAT_NONE             0    /* no status */
-#define STAT_OK               1    /* ok (to send/list) */
+#define STAT_NONE             0b0000000000000000  /* no status */
+#define STAT_OK               0b0000000000000001  /* ok (to send/list) */
 /* list */
-#define STAT_NOT_FOUND        2    /* file was deleted/not found */
-#define STAT_EXCLUDED         4    /* file was excluded */
-#define STAT_CHANGED          8    /* some value changed */
+#define STAT_NOT_FOUND        0b0000000000000010  /* file was deleted/not found */
+#define STAT_EXCLUDED         0b0000000000000100  /* file was excluded */
+#define STAT_CHANGED          0b0000000000001000  /* some value changed */
 /* send */
-#define STAT_FILELIMIT       16    /* file limit exceeded */
-#define STAT_BYTELIMIT       32    /* byte limit exceeded */
-#define STAT_PWERROR         64    /* password error */
-#define STAT_OFFLINE        128    /* not available right now */
+#define STAT_FILELIMIT        0b0000000000010000  /* file limit exceeded */
+#define STAT_BYTELIMIT        0b0000000000100000  /* byte limit exceeded */
+#define STAT_PWERROR          0b0000000001000000  /* password error */
+#define STAT_OFFLINE          0b0000000010000000  /* not available right now */
 
 /* file info modes (bitmask, 16 bits) */
-#define INFO_NONE             0    /* no mode */
-#define INFO_UPDATE           1    /* update description file */
-#define INFO_STRICT           2    /* strict syntax checking */
-#define INFO_SKIPS            4    /* allow missing data fields */
-#define INFO_UNUSED_2         8    /* */
-#define INFO_UNUSED_3        16    /* */
-#define INFO_DIR_BBS         32    /* dir.bbs */
-#define INFO_FILES_BBS       64    /* files.bbs */
-#define INFO_DESCRIPT_ION   128    /* descript.ion */
+#define INFO_NONE             0b0000000000000000  /* no mode */
+#define INFO_UPDATE           0b0000000000000001  /* update description file */
+#define INFO_STRICT           0b0000000000000010  /* strict syntax checking */
+#define INFO_SKIPS            0b0000000000000100  /* allow missing data fields */
+#define INFO_RELAX            0b0000000000001000  /* ignore syntax errors */
+#define INFO_DIR_BBS          0b0000000000010000  /* dir.bbs */
+#define INFO_FILES_BBS        0b0000000000100000  /* files.bbs */
+#define INFO_DESCRIPT_ION     0b0000000001000000  /* descript.ion */
+
 
 /* file info fields */
 #define FIELD_NONE            0    /* no type */
@@ -148,6 +152,7 @@
 /* size */
 #define FIELD_FORM_BYTES      1    /* number of bytes */
 #define FIELD_FORM_UNIT       2    /* number and unit */
+#define FIELD_FORM_SHORT      3    /* number and short unit */
 /* date */
 #define FIELD_FORM_US         1    /* MM-DD-YY */
 #define FIELD_FORM_ISO        2    /* YYYY-MM-DD */

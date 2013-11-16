@@ -439,13 +439,16 @@ void FillString(char *String, char Char, unsigned short Number, unsigned short M
 
 /*
  *  limit digits of a number
+ *
+ *  returns:
+ *  - limited number
  */
 
 long long LimitNumber(long long Number, unsigned short Digits)
 {
   long long         Value = 1;     /* return value */
 
-  /* calculate limit */
+  /* calculate upper limit to match number of digits */
   while (Digits > 0)
   {
     Value = Value * 10;
@@ -460,65 +463,155 @@ long long LimitNumber(long long Number, unsigned short Digits)
 }
 
 
+
 /*
- *  convert long long integer into string with byte unit
+ *  convert number of bytes into string with a specific format
+ *
+ *  requires:
+ *  - number of bytes
+ *  - maximun allowed string width
+ *  - output format (FIELD_FORM_*)
+ *  - pointer to string buffer
+ *  - size of string buffer
  *
  *  returns:
  *  - 1 on success
  *  - 0 on any problem
  */
 
-_Bool Bytes2String(long long Bytes, int Width, char *Buffer, size_t Size)
+_Bool Bytes2StringN(Bytes, Width, Format, Buffer, Size)
+  long long         Bytes;
+  unsigned short    Width;
+  unsigned short    Format;
+  char              *Buffer;
+  size_t            Size;
 {
   _Bool             Flag = False;       /* return value */
-  long long         Limit = 1;
-  unsigned int      Counter;
-  char              Unit;
+  long long         Limit = 1;          /* limit for value */
+  unsigned short    Counter;            /* simple counter */
+  unsigned short    UnitLength = 0;     /* length of unit */
+  _Bool             SI_Flag = False;    /* decimal/binary flag */
+  _Bool             IEC_Flag = False;   /* IEC units */
+  char              Unit[4] = {0, 0, 0, 0};  /* unit */
+
 
   /* sanity checks */
   if ((Buffer == NULL) || (Width < 4) || (Width >= Size)) return Flag;
 
-  /* calculate limit */
-  Counter = Width;
-  while (Counter > 0)
+  /* check for use of SI units */
+  if (Env->CfgSwitches & SW_SI_UNITS) SI_Flag = True;
+
+  /* check for use of IEC units */
+  if (Env->CfgSwitches & SW_IEC_UNITS)
   {
-    Limit = Limit * 10;
+    IEC_Flag = True;
+    SI_Flag = False;     /* IEC units imply binary factor */
+  }
+
+  /* determine required space for prefix and unit */
+  /* also set unit specifics */
+  if (Format == FIELD_FORM_UNIT)        /* bytes with unit */
+  {
+    if (IEC_Flag)        /* KiB */
+    {
+      UnitLength = 3;
+      Unit[1] = 'i';
+    }
+    else                 /* kB */
+    {
+      UnitLength = 2;
+    }
+
+    Unit[UnitLength - 1] = 'B';
+  }
+  else if (Format == FIELD_FORM_SHORT)  /* bytes with short unit */
+  {
+    if (IEC_Flag)        /* Ki */
+    {
+      UnitLength = 2;
+      Unit[1] = 'i';
+    }
+    else                 /* k */
+    {
+      UnitLength = 1;
+    }
+  }
+
+  /* calculate upper value limit which fits the width */
+  Counter = Width;            /* maximum number of digits */
+  while (Counter > 0)         /* for each digit */
+  {
+    Limit *= 10;              /* multiply by 10^1 */
     Counter--;
   }
+  Limit--;                    /* -1 to fit width */
 
-  /* crunch bytes */
-  Counter = 0;
-  while (Bytes >= Limit)
+  /* byte limit */
+  if (Format == FIELD_FORM_BYTES)  /* bytes without unit */
   {
-    Bytes = Bytes / 1024;
-    Counter++;
-    if (Counter == 1) Limit = Limit / 10;   /* save one char for unit */
+    if (Bytes > Limit)             /* limit exceeded */
+    {
+      Bytes = Limit;               /* use limit */ 
+    }
   }
 
-  /* unit */
+  /* scale bytes to required width */
+  if (UnitLength > 0)         /* output unit */
+  {
+    if (Bytes > Limit)        /* limit exceeded */
+    {
+      /* first adjust limit to length if unit */
+      Counter = UnitLength;
+      while (Counter > 0)         /* for each char */
+      {
+        Limit /= 10;              /* remove a digit */
+        Counter--;
+      }
+
+      /* scale down bytes */
+      while (Bytes > Limit)
+      {
+        if (SI_Flag)       /* use 1000 */
+        {
+          Bytes /= 1000;
+        }
+        else               /* use 1024 */
+        {
+          Bytes /= 1024;
+        }
+
+        Counter++;
+      }
+    }
+  }
+
+  /* prefix */
   switch (Counter)
   {
     case 1:
-      Unit = 'k';
+      if (IEC_Flag) Unit[0] = 'K';
+      else Unit[0] = 'k';
       break;
+
     case 2:
-      Unit = 'M';
+      Unit[0] = 'M';
       break;
+
     case 3:
-      Unit = 'G';
+      Unit[0] = 'G';
       break;
   }
 
   /* build string */
-  if (Counter > 0)     /* with unit */
-  { 
-    if (sprintf(Buffer, "%*lld%c", Width - 1, Bytes, Unit) > 0) Flag = True;
+  if (Counter > 0)       /* with prefix and unit */
+  {  
+    if (sprintf(Buffer, "%*lld%s", Width - UnitLength, Bytes, &Unit[0]) > 0) Flag = True;
   }
-  else                 /* no unit */
+  else                   /* without unit, just bytes */
   {
     if (sprintf(Buffer, "%*lld", Width, Bytes) > 0) Flag = True;
   }
-
+ 
   return Flag;
 }
 

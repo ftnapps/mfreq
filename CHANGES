@@ -6,6 +6,23 @@
 
 ------------------------------------------------------------------------------
 
+* 2013-11 / Version 3.10
+
+all:
+  - Extended Bytes2String() and String2Bytes() to support IEC unit prefixes.
+
+mfreq-list:
+  - Added a "Short" format for filesizes in description files. 
+  - Added InfoMode switches "SI-Units" and "IEC-Units" to enable the use of
+    SI unit prefixes for in/output and IEC prefixes for output.
+  - Added InfoMode switch "Relax" to ignore syntax errors in file description
+    files.
+
+mfreq-srif:
+  - Added SetMode switches "SI-Units" and "IEC-Units" to enable the use of
+    SI unit prefixes for in/output and IEC prefixes for output.
+
+
 * 2013-10 / Version 3.09
 
 mfreq-srif:
