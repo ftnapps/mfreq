@@ -36,9 +36,9 @@
 
 /* about */
 #define PROJECT          "mfreq"
-#define VERSION          "v3.10"
+#define VERSION          "v3.11"
 #define VERSION_MAJOR    3
-#define VERSION_MINOR    10
+#define VERSION_MINOR    11
 #define COPYRIGHT        "(c) 1994-2013 by Markus Reschke"
 
 /* default paths */
@@ -111,14 +111,15 @@
 #define STAT_NONE             0b0000000000000000  /* no status */
 #define STAT_OK               0b0000000000000001  /* ok (to send/list) */
 /* list */
-#define STAT_NOT_FOUND        0b0000000000000010  /* file was deleted/not found */
-#define STAT_EXCLUDED         0b0000000000000100  /* file was excluded */
+#define STAT_NOT_FOUND        0b0000000000000010  /* file deleted / not found */
+#define STAT_EXCLUDED         0b0000000000000100  /* file excluded */
 #define STAT_CHANGED          0b0000000000001000  /* some value changed */
 /* send */
 #define STAT_FILELIMIT        0b0000000000010000  /* file limit exceeded */
 #define STAT_BYTELIMIT        0b0000000000100000  /* byte limit exceeded */
 #define STAT_PWERROR          0b0000000001000000  /* password error */
 #define STAT_OFFLINE          0b0000000010000000  /* not available right now */
+#define STAT_DUPE             0b0000000100000000  /* duplicate file */
 
 /* file info modes (bitmask, 16 bits) */
 #define INFO_NONE             0b0000000000000000  /* no mode */
@@ -261,7 +262,7 @@ typedef struct limit
 } Limit_Type;
 
 
-/* files to send (linked list) */
+/* file found (linked list) */
 typedef struct response
 {
   char              *Filepath;          /* filepath */

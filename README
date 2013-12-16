@@ -793,6 +793,10 @@ The message is formatted like this:
   [Result]
   [MailFooter]
 
+Password errors are treated like "no files found". By omitting any
+information about password problems the requestor is discouraged from
+password guessing.
+
 
 * Configuration
 

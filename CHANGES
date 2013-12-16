@@ -6,6 +6,21 @@
 
 ------------------------------------------------------------------------------
 
+* 2013-12 / Version 3.11
+
+mfreq-srif:
+  - Got own product ID allocated by FTSC and updated WritePacketHeader() to
+    reflect new ID.
+  - Added detection of duplicate files to prevent sending the same file
+    multiple times.
+  - Fixed password checking bug in SearchIndex().
+  - Changed logging of password errors. If "LogRequest" is enabled password
+    errors are reported by the request logging.
+  - The request report for the requestor treats password errors as "no files
+    found" now. By omitting any information about password problems the 
+    requestor is discouraged from password guessing.
+
+
 * 2013-11 / Version 3.10
 
 all:

@@ -114,6 +114,7 @@
 
   extern void FreeResponseList(Response_Type *List);
   extern Response_Type *CreateResponseElement(char *Filepath);
+  extern _Bool DuplicateResponse(Response_Type *Response);
 
   extern void FreeRequestList(Request_Type *List);
   extern _Bool AddRequestElement(char *Name, char *Password);

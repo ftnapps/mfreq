@@ -529,7 +529,7 @@ _Bool WritePacketHeader(FILE *File)
     Packet2->packetType = htole16(2);
     Packet2->origNet = htole16(Env->ActiveLocalAKA->Net);
     Packet2->destNet = htole16(Env->ActiveRemoteAKA->Net);
-    Packet2->prodCode = 0xFE;      /* no allocated product ID */
+    Packet2->prodCode = 0xFF;      /* got 16bit product ID */
     Packet2->serialNo = 0;
 
     /* empty password (null padded) */
@@ -557,8 +557,8 @@ _Bool WritePacketHeader(FILE *File)
         Packet2plus->origNet = htole16(-1);
       }
 
-      Packet2plus->ProductCode_L = 0xFE;     /* no allocated product ID */
-      Packet2plus->ProductCode_H = 0x00;     /* request one from FTSC? */
+      Packet2plus->ProductCode_L = 0xFF;     /* allocated product ID */
+      Packet2plus->ProductCode_H = 0x1A;
 
       Packet2plus->CapabilWord = htole16(CW_2PLUS);
       /* copy of Capability Word in reversed byte order (MSB LSB) */
@@ -806,9 +806,11 @@ _Bool WriteMailContent(FILE *File)
 {
   _Bool                  Flag = False;        /* return value */
   Token_Type             *Token;
-  Request_Type           *Request;
-  Response_Type          *Response;
+  Request_Type           *Request;            /* requested file */
+  Response_Type          *Response;           /* file found */
   char                   *Help;
+  unsigned int           FileCounter;
+  unsigned int           ErrorCounter;
 
   /* sanity check */
   if (File == NULL) return Flag;
@@ -819,6 +821,7 @@ _Bool WriteMailContent(FILE *File)
    */
 
   Flag = True;
+
 
   /*
    *  header
@@ -841,6 +844,7 @@ _Bool WriteMailContent(FILE *File)
     }
   }
 
+
   /*
    *  results
    */
@@ -856,63 +860,91 @@ _Bool WriteMailContent(FILE *File)
 
   while (Request)                  /* follow list */
   {
-    /* what's requested */
+    /* what's requested? */
     snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
       "\r\nRequested \"%s\":\r\n", Request->Name);
     fputs(OutBuffer, File);
 
-    Response = Request->Files;
+    FileCounter = 0;               /* reset counter */
+    ErrorCounter = 0;
+    Response = Request->Files;     /* list of files found */
 
-    if (Response == NULL)        /* no match(es) */
+    while (Response)          /* follow file list */
+    {
+      OutBuffer[0] = 0;            /* reset buffer */
+      Help = GetFilename(Response->Filepath);     /* get filename */
+
+      if (Help)          /* sanity check */
+      {
+        FileCounter++;        /* got another file */
+
+        /* file is ok */
+        if (Response->Status & STAT_OK)
+        {
+          if (Bytes2String(Response->Size, TempBuffer, DEFAULT_BUFFER_SIZE - 1))
+            snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
+              "  - %s (%s)\r\n", Help, TempBuffer);
+          else
+            snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
+              "  - %s (%ld Bytes)\r\n", Help, Response->Size);
+        }
+
+        /* password error */
+        else if (Response->Status & STAT_PWERROR)
+        {
+          ErrorCounter++;        /* got a password error */
+        }
+
+        /* file limit exceeded */
+        else if (Response->Status & STAT_FILELIMIT)
+        {
+          snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
+            "  - next file would exceed file limit\r\n");
+        }
+
+        /* byte limit exceeded */
+        else if (Response->Status & STAT_BYTELIMIT)
+        {
+          snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
+            "  - next file would exceed byte limit\r\n");
+        }
+
+        /* duplicate file */
+        else if (Response->Status & STAT_DUPE)
+        {
+          snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
+            "  - %s (duplicate file)\r\n", Help);
+        }
+
+        /* file currently offline */
+        else if (Response->Status & STAT_OFFLINE)
+        {
+          snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
+            "  - %s (currently not available)\r\n", Help);
+        }
+
+        /* unknown file status */
+        else
+        {
+          ErrorCounter++;        /* got an error */
+        }
+
+        /* write buffer if changed */
+        if (OutBuffer[0] != 0) fputs(OutBuffer, File);
+      }
+
+      Response = Response->Next;        /* next file */ 
+    }
+
+    /* no files or only errors */
+    if (FileCounter == ErrorCounter)
     {
       snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
         "  - nothing found\r\n");
       fputs(OutBuffer, File);
     }
-    else                         /* got match(es) */    
-    {
-      while (Response)             /* follow list */
-      {
-        Help = GetFilename(Response->Filepath);
 
-        if (Help)       /* sanity check */
-        {
-          if (Response->Status & STAT_OK)       /* valid file */
-          {
-            if (Bytes2String(Response->Size, TempBuffer, DEFAULT_BUFFER_SIZE - 1))
-              snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
-                "  - %s (%s)\r\n", Help, TempBuffer);
-            else
-              snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
-                "  - %s (%ld Bytes)\r\n", Help, Response->Size);
-
-            fputs(OutBuffer, File);
-          }
-          else if (Response->Status & STAT_FILELIMIT)
-          {
-            snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
-              "  - next file would exceed file limit\r\n");
-            fputs(OutBuffer, File);
-          }
-          else if (Response->Status & STAT_BYTELIMIT)
-          {
-            snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
-              "  - next file would exceed byte limit\r\n");
-            fputs(OutBuffer, File);
-          }
-          else if (Response->Status & STAT_OFFLINE)
-          {
-            snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
-              "  - %s (currently not available)\r\n", Help);
-            fputs(OutBuffer, File);
-          }
-        }
-
-        Response = Response->Next;      /* next one */ 
-      }
-    }
-
-    Request = Request->Next;       /* next one */
+    Request = Request->Next;       /* next request */
   }
 
 
