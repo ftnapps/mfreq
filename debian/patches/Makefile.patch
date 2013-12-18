@@ -1,11 +1,12 @@
 Description: MFreq Makefile patch for Debian Packaging
  - Change PREFIX in upstream Makefile to '/usr' for package build.
+ - Remove line in upstream Makefile stripping executables prior to installation.
 Author: Robert James Clay <jame@rocasa.us>
-Last-Update: <2013-10-28>
+Last-Update: <2013-12-18>
 
---- mfreq-3.09.orig/Makefile
-+++ mfreq-3.09/Makefile
-@@ -21,7 +21,7 @@ LDFLAGS =
+--- a/Makefile
++++ b/Makefile
+@@ -21,7 +21,7 @@
  LIBS =
  
  # where to install stuff
@@ -14,3 +15,11 @@ Last-Update: <2013-10-28>
  
  # objects
  OBJ_COMMON = log.o misc.o tokenizer.o
+@@ -83,7 +83,6 @@
+ #
+ 
+ install: ${PROGS}
+-	strip ${PROGS}
+ 	cp -f mfreq-index ${PREFIX}/bin
+ 	cp -f mfreq-list ${PREFIX}/bin
+ 	cp -f mfreq-srif ${PREFIX}/bin
