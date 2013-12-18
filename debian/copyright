@@ -1,6 +1,6 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: mfreq
-Source: <url://example.com>
+Source: http://sourceforge.net/p/ftnapps/mfreq
 
 Files: *
 Copyright: 1993-2013 Markus Reschke < madires@theca-tabellaria.de>
