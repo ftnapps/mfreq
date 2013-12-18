@@ -4,7 +4,7 @@ Priority: extra
 Maintainer: Robert James Clay <jame@rocasa.us>
 Build-Depends: debhelper (>= 8.0.0)
 Standards-Version: 3.9.3
-Homepage: <insert the upstream URL, if relevant>
+Homepage: http://sourceforge.net/p/ftnapps/mfreq/ci/master/tree
 Vcs-Git: git://git.code.sf.net/p/ftnapps/mfreq
 Vcs-Browser: http://sourceforge.net/p/ftnapps/mfreq/ci/master/tree
 
