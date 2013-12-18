@@ -21,6 +21,6 @@ Section: debug
 Depends: mfreq (= ${binary:Version}), ${misc:Depends}
 Description: debugging symbols for mfreq
  MFreq consists of a file index generator, filelist generator and an SRIF
- compatiblee Fidonet Technology Network (FTN) file request handler.
+ compatible Fidonet Technology Network (FTN) file request handler.
  .
  This package contains the debugging symbols for mfreq.
