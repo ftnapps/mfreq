@@ -1,26 +1,22 @@
 debian/TODO for mfreq
 =====================
 
-- Existing Makefile also does a 'strip' on the three programs before doing the
-  copy, so that aspect will need to be fixed for package building so that it's
-  optional as is standard for debian pkg builds.
+- Still getting this even after patching the Makefile to not strip.
+W: mfreq-dbg: empty-binary-package
 
-- Correct or otherwise take care of the following Lintian warnings
-W: mfreq source: superfluous-clutter-in-homepage <insert the upstream URL, if relevant>
-W: mfreq source: bad-homepage <insert the upstream URL, if relevant>
-W: mfreq: copyright-has-url-from-dh_make-boilerplate
+- Need to add something to debian readme or remove it.
 W: mfreq: readme-debian-contains-debmake-template
-W: mfreq: superfluous-clutter-in-homepage <insert the upstream URL, if relevant>
-W: mfreq: bad-homepage <insert the upstream URL, if relevant>
+
+- Correct or otherwise take care of these other Lintian warnings
+W: mfreq: hardening-no-relro usr/bin/mfreq-index
+W: mfreq: hardening-no-fortify-functions usr/bin/mfreq-index
+W: mfreq: hardening-no-relro usr/bin/mfreq-list
+W: mfreq: hardening-no-fortify-functions usr/bin/mfreq-list
+W: mfreq: hardening-no-relro usr/bin/mfreq-srif
+W: mfreq: hardening-no-fortify-functions usr/bin/mfreq-srif
+
+- Create man pages for the executables. Use help2man?
 W: mfreq: binary-without-manpage usr/bin/mfreq-index
 W: mfreq: binary-without-manpage usr/bin/mfreq-list
 W: mfreq: binary-without-manpage usr/bin/mfreq-srif
-W: mfreq-dbg: copyright-has-url-from-dh_make-boilerplate
-W: mfreq-dbg: superfluous-clutter-in-homepage <insert the upstream URL, if relevant>
-W: mfreq-dbg: bad-homepage <insert the upstream URL, if relevant>
-W: mfreq-dbg: empty-binary-package
-
-- Correct space in mfreq-index name in debian/mfreq.1
-
-- Create man pages for the executables.
 
