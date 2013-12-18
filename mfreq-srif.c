@@ -523,35 +523,47 @@ long GetLetterOffset(IndexLookup_Type *List, char Char)
 
 void LogRequest()
 {
-  Request_Type           *Request;
-  Response_Type          *Response;
-  char                   *Help;
+  Request_Type           *Request;      /* file(s) requested */
+  Response_Type          *Response;     /* file found */
+  char                   *Help;         /* temporary string */
 
   Request = Env->RequestList;           /* get first request */
 
   while (Request)                       /* follow requests */
   {
-    Log(L_INFO, "Requested: %s", Request->Name);
+    /* what's requested */
+    if (Request->PW)
+      Log(L_INFO, "Requested: %s !%s", Request->Name, Request->PW);
+    else
+      Log(L_INFO, "Requested: %s", Request->Name);
 
-    Response = Request->Files;          /* get first response */
+    Response = Request->Files;          /* get first file */
 
-    while (Response)                    /* follow responses */
+    while (Response)                    /* follow files */
     {
       Help = GetFilename(Response->Filepath);   /* get pointer to filename */
+      if (Help == NULL) Help = Response->Filepath;
 
       if (Help)       /* sanity check */
       {
-        if (Response->Status & STAT_OK)      /* valid file */
+        /* file is ok */
+        if (Response->Status & STAT_OK)
         {
           if (Bytes2String(Response->Size, TempBuffer, DEFAULT_BUFFER_SIZE - 1))
             Log(L_INFO, "Responded: %s (%s)", Help, TempBuffer);
         }
+
+        /* password error */
+        else if (Response->Status & STAT_PWERROR)
+        {
+          Log(L_INFO, "PW Error:  %s", Help);
+        }
       }
 
-      Response = Response->Next;      /* next one */
+      Response = Response->Next;      /* next file */
     }
 
-    Request = Request->Next;       /* next one */
+    Request = Request->Next;       /* next request */
   }
 }
 
@@ -655,9 +667,9 @@ _Bool WriteResponse()
 {
   _Bool                  Flag = False;      /* return value */
   _Bool                  Run = True;        /* control flag */
-  FILE                   *File;
-  Request_Type           *Request;
-  Response_Type          *Response;
+  FILE                   *File;             /* file stream */
+  Request_Type           *Request;          /* requests */
+  Response_Type          *Response;         /* files found */
 
   /*
    *  file list syntax: <flag><filepath>
@@ -901,11 +913,11 @@ _Bool SearchIndex(FILE *DataFile, FILE *AliasFile, Request_Type *Request, int Po
   _Bool                  Run = True;          /* loop control */
   _Bool                  Match = False;       /* match flag */
   _Bool                  AnyCase = False;     /* case insensitive search */
-  size_t                 Length;
-  char                   *Help;
+  size_t                 Length;              /* string length */
+  char                   *Help;               /* temporary string */
   char                   *Name, *Filepath, *Password;
-  int                    Check;
-  Response_Type          *Response;
+  int                    Check;               /* test value */
+  Response_Type          *Response;           /* response element */
   
   /* sanity checks */
   if ((DataFile == NULL) ||
@@ -1116,15 +1128,34 @@ _Bool SearchIndex(FILE *DataFile, FILE *AliasFile, Request_Type *Request, int Po
       }
 
       /* check password if required */
-      if (Match && Request->PW)
+      if (Match && Password)
       {
-        if ((Password == NULL) || (strcmp(Request->PW, Password) != 0))
+        /* check if the request password matches the index one */
+        if ((Request->PW == NULL) || (strcmp(Request->PW, Password) != 0))
         {
-          Response->Status |= STAT_PWERROR;
-          Match = False;
-          Help = GetFilename(Response->Filepath);
-          if (Help) Log(L_INFO, "Password error for %s", Help);
-          else Log(L_INFO, "Password error for %s", Response->Filepath);
+          Response->Status |= STAT_PWERROR;       /* set flag */
+          Match = False;                          /* skip file */
+
+          /* log PW error if not done later on */
+          if (!(Env->CfgSwitches & SW_LOG_REQUEST))
+          {
+            Help = GetFilename(Response->Filepath);
+            if (Help == NULL) Help = Response->Filepath;
+            if (Request->PW)
+              Log(L_INFO, "PW error: %s (req: %s !%s)", Help, Request->Name, Request->PW);
+            else
+              Log(L_INFO, "PW error: %s (req: %s)", Help, Request->Name);
+          }
+        }
+      }
+
+      /* check for duplicate files */
+      if (Match)
+      {
+        if (DuplicateResponse(Response))     /* this is a dupe */
+        {
+          Response->Status |= STAT_DUPE;     /* set flag */
+          Match = False;                     /* skip file */
         }
       }
     }

@@ -247,6 +247,63 @@ Response_Type *CreateResponseElement(char *Filepath)
 
 
 
+/*
+ *  check all files found yet for a duplicate file
+ *
+ *  requires:
+ *  - response element to check
+ *
+ *  returns:
+ *  - 0 if no duplicate is found
+ *  - 1 if a duplicate is found
+ */
+
+_Bool DuplicateResponse(Response_Type *Response)
+{
+  _Bool                  Flag = False;       /* return value */
+  Request_Type           *Request = NULL;
+  Response_Type          *File;
+
+  /* sanity check */
+  if (Response == NULL) return Flag;
+
+  if (Env) Request = Env->RequestList;       /* get starting point */
+
+
+  /*
+   *  loop through all requested files and the files found
+   *  and check for duplicate filepath
+   */
+
+  while (Request && !Flag)    /* loop through requests */
+  {
+    File = Request->Files;         /* first file found */
+
+    while (File && !Flag)     /* loop through files found */
+    {
+      if (File != Response)        /* skip me */
+      {
+        /* check if both got the same filepath */
+        if (File->Filepath && Response->Filepath)
+        {
+          if (strcmp(File->Filepath, Response->Filepath) == 0)
+          {
+            Flag = True;           /* signal dupe */
+          }
+        }
+      }
+
+      File = File->Next;                /* next file */
+    }
+
+    Request = Request->Next;            /* next request */
+  }
+
+  return Flag;
+}
+
+
+
 /* ************************************************************************
  *   requested files (linked list)
  * ************************************************************************ */
