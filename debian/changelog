@@ -1,5 +1,5 @@
-mfreq (3.11-1~1) UNRELEASED; urgency=low
+mfreq (3.11-0precise1~1) UNRELEASED; urgency=low
 
-  * Initial release as a Debian package.
+  * Initial release as an Ubuntu package.
 
  -- Robert James Clay <jame@rocasa.us>  Wed, 18 Dec 2013 03:34:55 -0500
