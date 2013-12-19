@@ -1,1 +1,4 @@
 debian/mfreq.1
+debian/mfreq-index.1
+debian/mfreq-list.1
+debian/mfreq-srif.1
