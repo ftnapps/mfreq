@@ -14,3 +14,11 @@ export LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
 
 override_dh_auto_install:
 	$(MAKE) install
+
+override_dh_installdocs:
+	dh_installdocs --link-doc=mfreq
+
+override_dh_strip:
+	dh_strip --dbg-package=mfreq-dbg
+
+.PHONY: override_dh_strip
