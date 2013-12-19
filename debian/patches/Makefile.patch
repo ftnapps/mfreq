@@ -6,7 +6,16 @@ Last-Update: <2013-12-18>
 
 --- a/Makefile
 +++ b/Makefile
-@@ -21,7 +21,7 @@
+@@ -14,14 +14,14 @@
+ 
+ # compiler flags
+ CC = gcc
+-CFLAGS = -Wall -g -I/usr/include -I. ${DEFINES}
+-LDFLAGS =
++CFLAGS += -Wall -g -I/usr/include -I. ${DEFINES}
++LDFLAGS +=
+ 
+ # libraries to link
  LIBS =
  
  # where to install stuff
