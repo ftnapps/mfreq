@@ -1,0 +1,39 @@
+.\"                                      Hey, EMACS: -*- nroff -*-
+.\" (C) Copyright 2013 Robert James Clay <jame@rocasa.us>,
+.\"
+.\" First parameter, NAME, should be all caps
+.\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
+.\" other parameters are allowed: see man(7), man(1)
+.TH MFREQ\-INDEX 1 "December 19, 2013"
+.\" Please adjust this date whenever revising the manpage.
+.\"
+.\" Some roff macros, for reference:
+.\" .nh        disable hyphenation
+.\" .hy        enable hyphenation
+.\" .ad l      left justify
+.\" .ad b      justify to both left and right margins
+.\" .nf        disable filling
+.\" .fi        enable filling
+.\" .br        insert line break
+.\" .sp <n>    insert n+1 empty lines
+.\" for manpage-specific macros, see man(7)
+.SH NAME
+mfreq\-index \- This tool scans fileechos and directories to create an file index
+for a fast frequest processing later on. It also takes care of magic file names.
+
+.SH SYNOPSIS
+.B mfreq-index
+.RI [\-h/\-?] [\-c <cfg filepath>] [\-l <log filepath>]
+.SH DESCRIPTION
+This tool scans fileechos and directories to create an file index for a fast file
+request processing later on. It also takes care of magic file names. For a complete
+description of how to use it, see the example configuration files and the README.
+.PP
+This manual page was written by Robert James Clay <jame@rocasa.us> for the Debian
+packaging (but may be used by others).
+.SH SEE ALSO
+.BR /usr/share/doc/mfreq/README.gz
+.BR mfreq-index (1),
+.BR mfreq-list (1),
+.BR mfreq-srif (1).
+.BR
