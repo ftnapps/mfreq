@@ -1,6 +1,17 @@
 mfreq for Debian
 ----------------
 
-<possible notes regarding this package - if none, delete this file>
+mfreq is a suite of tools for Fidonet/FTN (Fidonet Technology Network) style
+file requesting. It consists of a file index generator, filelist generator,
+and an SRIF compatible file request handler.
 
- -- Robert James Clay <jame@rocasa.us>  Sat, 26 Jan 2013 04:37:55 -0500
+The mfreq-index, mfreq-list, and mfreq-srif binaries are installed to the
+/usr/bin directory.
+
+Example configuration files are available in /usr/share/doc/mfreq/examples.
+
+More detailed information is available in /usr/share/doc/mfreq/README.gz.
+
+
+
+ -- Robert James Clay <jame@rocasa.us>  Thu, 19 Dec 2013 01:12:37 -0500
