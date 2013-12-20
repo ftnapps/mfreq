@@ -1016,6 +1016,7 @@ Format of entries in the log file:
 The latest version is available via:
   - frequest at 2:240/1661 (magic MFREQ)
   - GIT at sourceforge.net/p/ftnapps/mfreq
+  - GIT at https://github.com/ftnapps/mfreq
 
 
 * Forks & Other OSs
