@@ -1,5 +1,5 @@
-mfreq (3.11-1~1) UNRELEASED; urgency=low
+mfreq (3.11-0wheezy1) wheezy; urgency=low
 
   * Initial release as a Debian package.
 
- -- Robert James Clay <jame@rocasa.us>  Wed, 18 Dec 2013 03:34:55 -0500
+ -- Robert James Clay <jame@rocasa.us>  Fri, 20 Dec 2013 12:22:31 -0500
