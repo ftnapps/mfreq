@@ -1,22 +1,15 @@
 debian/TODO for mfreq
 =====================
 
-- Still getting this even after patching the Makefile to not strip.
-W: mfreq-dbg: empty-binary-package
+- Instead of the minimal man pages created for the Debian/Ubuntu packaging,
+  use help2man to dynamically create them the man pages from the executables?
+  Or encourage upstream to create source files usable to create them, as well
+  as html versions of them?  
 
-- Need to add something to debian readme or remove it.
-W: mfreq: readme-debian-contains-debmake-template
+- If/when new source archives are available at an internet accessible place,
+  update debian/watch for how they are available.
 
-- Correct or otherwise take care of these other Lintian warnings
-W: mfreq: hardening-no-relro usr/bin/mfreq-index
-W: mfreq: hardening-no-fortify-functions usr/bin/mfreq-index
-W: mfreq: hardening-no-relro usr/bin/mfreq-list
-W: mfreq: hardening-no-fortify-functions usr/bin/mfreq-list
-W: mfreq: hardening-no-relro usr/bin/mfreq-srif
-W: mfreq: hardening-no-fortify-functions usr/bin/mfreq-srif
+- Do the 'See Also' entries in the man pages all need commas? Or not?
 
-- Create man pages for the executables. Use help2man?
-W: mfreq: binary-without-manpage usr/bin/mfreq-index
-W: mfreq: binary-without-manpage usr/bin/mfreq-list
-W: mfreq: binary-without-manpage usr/bin/mfreq-srif
+- Review wording etc. in all man pages, update as needed.
 
