@@ -36,10 +36,10 @@
 
 /* about */
 #define PROJECT          "mfreq"
-#define VERSION          "v3.11"
+#define VERSION          "v3.12"
 #define VERSION_MAJOR    3
-#define VERSION_MINOR    11
-#define COPYRIGHT        "(c) 1994-2013 by Markus Reschke"
+#define VERSION_MINOR    12
+#define COPYRIGHT        "(c) 1994-2014 by Markus Reschke"
 
 /* default paths */
 #define DEFAULT_CFG_PATH      "/etc/fido/mfreq"
@@ -245,8 +245,8 @@ typedef struct aka
 /* index definition (linked list) */
 typedef struct index
 {
-  char              *Filepath;          /* filepath of index files */
-  /* todo: add conditions */
+  char              *Filepath;          /* filepath of file index */
+  char              *MountingPoint;     /* mounting point */
   struct index      *Next;              /* pointer to next element */
 } Index_Type;
 

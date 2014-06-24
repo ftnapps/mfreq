@@ -2,7 +2,7 @@
  *
  *   misc support functions
  *
- *   (c) 2012 by Markus Reschke
+ *   (c) 2012-2014 by Markus Reschke
  *
  * ************************************************************************ */
 
@@ -24,6 +24,12 @@
 
 /* string stuff */
 #include <ctype.h>
+
+/* files */
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <dirent.h>
 
 
 
@@ -518,7 +524,7 @@ _Bool LockFile(FILE *File, char *Filepath)
   int           Value;
 
   /* sanity check */
-  if (File == NULL) return Flag;  
+  if (File == NULL) return Flag;
 
   FileDescriptor = fileno(File);          /* get fd */
 
@@ -533,6 +539,88 @@ _Bool LockFile(FILE *File, char *Filepath)
   {
     if (Filepath) Log(L_WARN, "Couldn't lock file (%s)!", Filepath);
   }
+
+  return Flag;
+}
+
+
+
+
+/*
+ *  Check if a path is a mounting point for a filesystem, i.e.
+ *  if a filesystem is currently mounted at that path.
+ *
+ *  requires:
+ *  - path of mounting point
+ *
+ *  returns:
+ *  - 1 if filesystem is mounted
+ *  - 0 on error or if fs is not mounted
+ */
+
+_Bool IsMountingPoint(char *Path)
+{
+  _Bool             Flag = False;      /* return value */
+  struct stat       FileData;
+  dev_t             DeviceID;
+  size_t            n;
+  char              *ParentPath = NULL;
+  char              *ErrPath = NULL;
+
+  /* sanity check */
+  if (Path == NULL) return Flag;
+
+  /* remove trailing slashes */
+  n = strlen(Path);
+  if (n > 0) n--;                  /* adjust for index */
+  while ((n > 0) && (Path[n] == '/'))
+  {
+    Path[n] = 0;
+    n--;
+  }
+
+  /* '/' is a mounting point by default */
+  if (n == 0) return Flag = True;
+
+  /* first get device ID of filesystem of mounting point */ 
+  if (stat(Path, &FileData) == 0)
+  {
+    DeviceID = FileData.st_dev;
+
+    /* get parent directory */
+    ParentPath = CopyString(Path);
+
+    /* find next slash in path */
+    n = strlen(ParentPath);
+    if (n > 0) n--;                /* adjust for index */    
+    while ((n > 0) && (ParentPath[n] != '/'))
+    {
+      ParentPath[n] = 0;
+      n--;
+    }
+
+    if (n > 0) ParentPath[n] = 0;       /* remove trailing slash */
+
+    /* the parent directory should have a different device ID */
+    if (stat(ParentPath, &FileData) == 0)
+    {
+      if (FileData.st_dev != DeviceID) Flag = True;
+    }
+    else            /* stat() failed */
+    {
+      ErrPath = ParentPath;
+    }
+  }
+  else              /* stat() failed */
+  {
+    ErrPath = Path;
+  }
+
+  /* log errors */
+  if (ErrPath != NULL) Log(L_WARN, "Couldn't stat() path (%s)!", ErrPath);
+
+  /* clean up */
+  if (ParentPath != NULL) free(ParentPath);
 
   return Flag;
 }

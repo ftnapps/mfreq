@@ -2,7 +2,7 @@
  *
  *   mfreq-srif (SRIF compatible frequest handler based on fsc-0086.001)
  *
- *   (c) 1994-2013 by Markus Reschke
+ *   (c) 1994-2014 by Markus Reschke
  *
  * ************************************************************************ */
 
@@ -885,7 +885,7 @@ _Bool ActivateLimits()
   if (Env->ActiveLimit)
   {
     if (Bytes2String(Env->ActiveLimit->Bytes, TempBuffer, DEFAULT_BUFFER_SIZE))
-      Log(L_INFO, "Limits used: %ld files / %s (unlimited: -1)",
+      Log(L_INFO, "Limits used: %ld files / %s",
           Env->ActiveLimit->Files, TempBuffer);
   }
 
@@ -1428,62 +1428,82 @@ _Bool ProcessRequest()
 
 
   /*
-   *  process all fileindexes
+   *  process all file indexes
    */
 
   Index = Env->IndexList;
+  if (Index == NULL) Log(L_WARN, "No fileindex specified!");
+
   while (Index)               /* follow index list */
   {
     /* reset variables to defaults */
-    Run = False;
+    Run = True;
     DataFile = NULL;
     AliasFile = NULL;
     OffsetFile = NULL;
+
+
+    /*
+     *  check index options 
+     */
+
+    if (Index->MountingPoint)      /* IfMounted option enabled */
+    {
+      /* check if filesystem is mounted */
+      Run = IsMountingPoint(Index->MountingPoint);
+      if (!Run) Log(L_WARN, "Skipped index (%s): fs not mounted", Index->Filepath);
+    }
+
 
     /*
      *  open index files
      */
 
-    /* open data file */
-    snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
-      "%s."SUFFIX_DATA, Index->Filepath);
-    DataFile = fopen(TempBuffer, "r");          /* read mode */
-
-    /* open alias file */
-    snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
-      "%s."SUFFIX_ALIAS, Index->Filepath);
-    AliasFile = fopen(TempBuffer, "r");         /* read mode */
-
-    /* open offset file */
-    snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
-      "%s."SUFFIX_OFFSET, Index->Filepath);
-    OffsetFile = fopen(TempBuffer, "r");        /* read mode */
-
-    /* check */
-    if (DataFile)
+    if (Run)
     {
-      if (AliasFile)
+      Run = False;            /* reset flag */
+
+      /* open data file */
+      snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
+        "%s."SUFFIX_DATA, Index->Filepath);
+      DataFile = fopen(TempBuffer, "r");          /* read mode */
+
+      /* open alias file */
+      snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
+        "%s."SUFFIX_ALIAS, Index->Filepath);
+      AliasFile = fopen(TempBuffer, "r");         /* read mode */
+
+      /* open offset file */
+      snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
+        "%s."SUFFIX_OFFSET, Index->Filepath);
+      OffsetFile = fopen(TempBuffer, "r");        /* read mode */
+
+      /* check if we got all files */
+      if (DataFile)
       {
-        if (OffsetFile)
+        if (AliasFile)
         {
-          /* read  lookup file */
-          snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
-            "%s."SUFFIX_LOOKUP, Index->Filepath);
-          if (ReadIndexLookup(TempBuffer)) Run = True;      /* ok to proceed */
+          if (OffsetFile)
+          {
+            /* read lookup file */
+            snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
+              "%s."SUFFIX_LOOKUP, Index->Filepath);
+            Run = ReadIndexLookup(TempBuffer);
+          }
+          else
+          {
+            Log(L_WARN, "Couldn't open index offset file (%s)!", Index->Filepath);
+          }
         }
         else
         {
-          Log(L_WARN, "Couldn't open index offset file (%s)!", Index->Filepath);
+          Log(L_WARN, "Couldn't open index alias file (%s)!", Index->Filepath);
         }
       }
       else
       {
-        Log(L_WARN, "Couldn't open index alias file (%s)!", Index->Filepath);
+        Log(L_WARN, "Couldn't open index data file (%s)!", Index->Filepath);
       }
-    }
-    else
-    {
-      Log(L_WARN, "Couldn't open index data file (%s)!", Index->Filepath);
     }
 
 
@@ -2035,12 +2055,12 @@ _Bool Add_Limit(Token_Type *TokenList)
 
         case 2:     /* files */
           Files = Str2Long(TokenList->String);
-          if (Files < 0) Run = False;
+          if (Files < -1) Run = False;
           break;
 
         case 3:     /* bytes */
           Bytes = String2Bytes(TokenList->String);
-          if (Bytes < 0) Run = False;
+          if (Bytes < -1) Run = False;
       }
 
       Keyword = 0;            /* reset */
@@ -2273,7 +2293,7 @@ _Bool Set_MailPath(Token_Type *TokenList)
 
 /*
  *  add file index
- *  Syntax: Index <filepath>
+ *  Syntax: Index <filepath> [IfMounted <mounting point>]
  *
  *  returns:
  *  - 1 on success
@@ -2284,8 +2304,12 @@ _Bool Add_Index(Token_Type *TokenList)
 {
   _Bool             Flag = False;       /* return value */
   _Bool             Run = True;         /* control flag */
-  unsigned short    Get = 0;            /* mode control */
-  Token_Type        *FilepathToken = NULL;
+  unsigned short    Keyword = 0;        /* keyword ID */
+  char              *IndexFilepath = NULL;
+  char              *MountingPoint = NULL;
+  static char       *Keywords[3] =
+    {"Index", "IfMounted", NULL};
+
 
   /* sanity check */
   if (TokenList == NULL) return Flag;
@@ -2297,18 +2321,26 @@ _Bool Add_Index(Token_Type *TokenList)
 
   while (Run && TokenList && TokenList->String)
   {
-    if (Get == 1)                  /* get value: filepath */
+    if (Keyword > 0)        /* get value */
     {
-      FilepathToken = TokenList;
-      Get = 0;                       /* reset */      
+      switch (Keyword)
+      {
+        case 1:     /* filepath of file index */
+          IndexFilepath = TokenList->String;
+          break;
+      
+        case 2:     /* path of mounting point */
+          MountingPoint = TokenList->String;
+          break;
+      }
+
+      Keyword = 0;             /* reset */
     }
-    else if (strcasecmp(TokenList->String, "Index") == 0)   /* filepath */
+    else                   /* get keyword */
     {
-      Get = 1;
-    }
-    else                                               /* unknown */
-    {
-      Run = False;
+      Keyword = GetKeyword(Keywords, TokenList->String);
+
+      if (Keyword == 0) Run = False;    /* unknown keyword */
     }
 
     TokenList = TokenList->Next;     /* goto to next token */
@@ -2319,7 +2351,7 @@ _Bool Add_Index(Token_Type *TokenList)
    *  check parser results
    */
 
-  if ((Run == False) || (Get > 0) || (FilepathToken == NULL))
+  if ((Run == False) || (Keyword > 0) || (IndexFilepath == NULL))
   {
     Run = False;
     LogCfgError();
@@ -2332,7 +2364,7 @@ _Bool Add_Index(Token_Type *TokenList)
 
   if (Run)
   {
-    Flag = AddIndexElement(FilepathToken->String);
+    Flag = AddIndexElement(IndexFilepath, MountingPoint);
   }
 
   return Flag;

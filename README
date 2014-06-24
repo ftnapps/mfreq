@@ -3,7 +3,7 @@
 
                             ReadMe for mfreq suite
 
-                       (c) 1994-2013 by Markus Reschke
+                       (c) 1994-2014 by Markus Reschke
 
 ------------------------------------------------------------------------------
 
@@ -240,8 +240,8 @@ Syntax:
   FileArea <path> [PW <password>] [Depth <levels>] [AutoMagic]
 
 With the FileArea command the files inside the given directory will be added
-to the file index. Use this command for each of your file areas/echos. If any
-file excludes are defined they'll be considered.
+to the internal file index (stored in RAM). Use this command for each of your
+file areas/echos. If any file excludes are defined they'll be considered.
 
 A password may be specified optionally to limit access.
 
@@ -281,18 +281,18 @@ levels (main configuration is the first level).
 Syntax:
   Index <filepath>
 
-The Index command writes all files in the file index to the specified
-filepath. Following files will be written:
+The Index command writes all files in the internal file index (stored in RAM)
+to the specified filepath. Following files will be written (based on SetMode):
   - <filepath>.data
   - <filepath>.lookup
   - <filepath>.alias
   - <filepath>.offset
 
-After writing the files the file index is emptied. So you could add other
-files and create another index for those by calling the Index command again.
-This might come in handy if you got memory contraints or you need different
-files indexes for some obscure reason :-) 
- 
+After writing the index the internal file index is emptied. Any new files are
+collected in the file index again, until another Index command will write
+those files to a new index and so on. This might come in handy if you got
+memory contraints or you need different file indexes for whatever reason.
+
 
 * ToDo / Feature Requests
 
@@ -450,8 +450,9 @@ is consulted when the FileArea command is executed.
 Syntax:
   Filelist <filepath>
 
-The Filelist command starts a new filelist. If the given filepath already
-exists it will be overwritten. An old filelist will be closed.
+The Filelist command starts a new filelist and any list output is written to
+that file until a new filelist is defined or mfreq-list ends. If the given
+file already exists it will be overwritten.
 
 
 + AddText Command
@@ -624,15 +625,18 @@ Syntax:
   SI-Units    enable SI byte units
   IEC-Units   enable IEC byte units output
 
-With InfoMode you set the source of file descriptions. When you enable
-files.bbs, you have to define it's format with the "Define files.bbs" command.
+With InfoMode you set several switches for file description files and select
+sources for file descriptions. When you enable files.bbs, you have also to
+define it's format with the "Define files.bbs" command. In case the dir.bbs
+switch is set, mfreq-list reads the area description from that file if
+available.
 
 If you want mfreq-list to update the description file, e.g. removing deleted
-files, set the Update switch.
+files, please set the Update switch.
 
 For strict position checking set the Strict switch, i.e. the start and end
 positions of the defined data fields must match exactly. The Skips switch
-allows missing data fields behind the filename (premature end of line). With
+allows missing data fields after the filename (premature end of line). With
 Relax set mfreq-list ignores syntax/format errors in file description files
 and keeps processing. So you'll get a filelist in any case. But be warned that
 the Relax switch may cause a lot of warnings being logged. If you set Relax
@@ -947,7 +951,9 @@ Some examples:
 
 The Files argument limits the number of files which may be requested. And
 the Bytes argument defines the maximum number of bytes allowed. Both values
-should be in the range of 0 to 2147483000 (2^31 - 1). Zero means "none". 
+should be in the range of 0 to 2147483000 (2^31 - 1). Zero means "none", i.e.
+that node won't get anything. There is also the special value "-1" for a
+unlimited number of files or bytes.
 
 For the byte value you may use following units:
   - kB for kilobytes (binary in default mode, decimal if SI units are enabled)
@@ -962,14 +968,21 @@ marks if you insert a space:
   - 10MB
   - "10 MB" 
 
-A rule like
-  Limit 1:2/3.4 Files 0
-would deny any files for the given system.
+Some examples:
 
-With the IfListed switch set the rule is only used if the node is listed
+  Limit 1:2/3.4 Files 0
+  -> deny any files for 1:2/3.4
+
+  Limit 2:240/* Files 10 Bytes -1       
+  -> net 2:240 get's up to 10 files with unlimited size  
+
+  Limit * Files 10 Bytes 5MiB
+  -> anyone else get's up to 10 files with a total size of 5MB
+
+With the IfListed switch set, the rule is only used if the node is listed
 in a nodelist. That information is provided by the mailer via the SRIF file.
 
-If you define any rules it's strongly recommended to define also a rule of
+If you define any rules, it's strongly recommended to define also a rule of
 last resort, like
   Limit * Files 10 Bytes 2MB
 
@@ -981,21 +994,26 @@ The following defaults are used if no limit is given at all:
 + Index Setting
 
 Syntax:
-  Index <filepath>
+  Index <filepath> [IfMounted <path>]
 
 The Index setting adds a file index to be used for file searching. You may
 add several file indexes if you like.
 
-The <filepath> argument will be expanded to a pair of files:
+The <filepath> argument will be expanded to match all the data files for a
+single index:
   - <filepath>.data
   - <filepath>.lookup
+  - <filepath>.alias
+  - <filepath>.offset
+
+For removable media you can set the IfMounted option. In that case the index
+is only considered if a filesystem is mounted at the given path. Of course
+you should have created a dedicated index with mfreq-index before.
 
 
 * ToDo / Feature Requests
 
 Some stuff which needs to be fixed or would be nice to have:
-  - Support of removable media (Index option: [IfMounted <path>])
-    by checking /proc/mount?
   - Support Time setting in SRIF file?
 
 
@@ -1036,7 +1054,7 @@ A big thank you to:
 
   Paul Quinn, 3:640/384, for beta-testing and some great feature suggestions.
   Rj Clay, 1:120/419, for the GIT repository at sourceforge (FTN
-  Applications).
+  Applications) and Github (ftnapps).
   Lars Kellogg-Stedman, 1:322/761, for the OS X version.
 
 

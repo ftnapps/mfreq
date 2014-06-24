@@ -2,7 +2,7 @@
  *
  *   functions header file
  *
- *   (c) 1994-2013 by Markus Reschke
+ *   (c) 1994-2014 by Markus Reschke
  *
  * ************************************************************************ */
 
@@ -41,6 +41,7 @@
 
   extern void UnlockFile(FILE *File);
   extern _Bool LockFile(FILE *File, char *Filepath);
+  extern _Bool IsMountingPoint(char *Path);
 
   extern char *GetFilename(char *Filepath);
 
@@ -106,7 +107,7 @@
 #ifndef REQ_C
 
   extern void FreeIndexList(Index_Type *List);
-  extern _Bool AddIndexElement(char *Filepath);
+  extern _Bool AddIndexElement(char *Filepath, char *MountingPoint);
 
   extern void FreeLimitList(Limit_Type *List);
   extern _Bool AddLimitElement(char *Address, long Files, long long Bytes,
