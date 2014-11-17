@@ -2,7 +2,7 @@
  *
  *   functions for filelist specific data management
  *
- *   (c) 1994-2012 by Markus Reschke
+ *   (c) 1994-2014 by Markus Reschke
  *
  * ************************************************************************ */
 
@@ -32,6 +32,9 @@
 
 /*
  *  free list of info elements
+ *
+ *  requires:
+ *  - pointer to fileinfo linked list
  */
 
 void FreeInfoList(Info_Type *List)
@@ -110,6 +113,10 @@ _Bool AddInfoElement(char *Name, off_t Size, time_t Time)
 /*
  *  search for info element matching a specific name
  *
+ *  requires:
+ *  - pointer to fileinfo linked list
+ *  - pointer to filename string
+ *
  *  returns:
  *  - pointer to element on match
  *  - NULL on error or mismatch
@@ -118,21 +125,37 @@ _Bool AddInfoElement(char *Name, off_t Size, time_t Time)
 Info_Type *SearchInfoList(Info_Type *List, char *Name)
 {
   Info_Type           *Element = NULL;       /* return value */
+  _Bool               AnyCase = False;       /* case sensitivity flag */
 
   /* sanity check */
   if (Name == NULL) return Element;
 
+  /* check for case-insensitive search */
+  if (Env->CfgSwitches & SW_ANY_CASE) AnyCase = True; 
+
   while (List)                /* follow list */
   {
-    if (List->Name &&
-       (strcmp(Name, List->Name) == 0))
+    if (List->Name)           /* sanity check */
     {
-      Element = List;
-      List = NULL;
+      if (AnyCase == False)   /* case sensitive */
+      {
+        /* check for match */
+        if (strcmp(Name, List->Name) == 0) Element = List;
+      }
+      else                    /* case insensitive */
+      {
+        /* check for match */
+        if (strcasecmp(Name, List->Name) == 0) Element = List;
+      }
     }
-    else
+
+    if (Element != NULL)      /* found match */
     {
-      List = List->Next;          /* next element */
+      List = NULL;                 /* end loop */
+    }
+    else                      /* no match */
+    {
+      List = List->Next;           /* next element */
     }
   }
 
@@ -143,6 +166,10 @@ Info_Type *SearchInfoList(Info_Type *List, char *Name)
 
 /*
  *  create and add new description line to Info element
+ *
+ *  requires:
+ *  - pointer to fileinfo element
+ *  - pointer to description string
  *
  *  returns:
  *  - 1 on success

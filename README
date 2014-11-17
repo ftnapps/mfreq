@@ -621,7 +621,8 @@ Syntax:
   Strict      enable strict position checking for data fields
   Skips       allow missing data fields behind filename
   Relax       don't end processing of file description file on
-              syntax errors       
+              syntax errors
+  AnyCase     match file names case-insensitive
   SI-Units    enable SI byte units
   IEC-Units   enable IEC byte units output
 
@@ -642,6 +643,16 @@ and keeps processing. So you'll get a filelist in any case. But be warned that
 the Relax switch may cause a lot of warnings being logged. If you set Relax
 and Update you can convert file descriptions files into the desired format. 
 
+When you got issues with the case-sensitivity of filenames on disk and in the
+file description file you can enable AnyCase to match the filenames case-
+insensitive. For example if the filenames on disk are lower case and the
+filenames in the files.bbs are upper case. Make sure that you don't got any
+filename doubles when case-sensitive matching is applied. For double filenames
+on disk the first one found will get the file description. Any other double
+is treated as a new file not in the file description file yet. If you got
+doubles in the file description file all descriptions of all doubles will be
+added to the first matching filename found on disk.
+ 
 The SI-Units switch enables metric unit prefixes for any input and output, i.e.
 1 kB = 1000 Bytes. By default the binary prefix system is used. The IEC-Units
 switch enables output of the IEC prefix recommendations (1024 Bytes = 1 KiB)
@@ -653,7 +664,7 @@ and overrides the SI-Units switch for output.
 Syntax:
   Reset [SetMode]
 
-As expected this command resetsseveral things back to their defaults:
+As expected this command resets several things back to their defaults:
 
   Keyword        Action
   -----------------------------------------------------
@@ -703,7 +714,6 @@ Some stuff which needs to be fixed or would be nice to have:
     (" <comment>" / "--- <comment>")
   - Support of descript.ion?
   - Support file_id.diz? Try to extract?
-  - Add switch for case-insensitive filenames in files.bbs.
 
 
 

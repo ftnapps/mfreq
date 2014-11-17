@@ -6,6 +6,13 @@
 
 ------------------------------------------------------------------------------
 
+* 2014-10 / Version 3.13
+
+mfreq-list:
+  - Added support for case-insensitive filenames in files.bbs (InfoMode
+    AnyCase switch).
+
+
 * 2014-06 / Version 3.12
 
 all:
