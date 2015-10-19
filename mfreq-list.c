@@ -2,7 +2,7 @@
  *
  *   mfreq-list
  *
- *   (c) 1994-2014 by Markus Reschke
+ *   (c) 1994-2015 by Markus Reschke
  *
  * ************************************************************************ */
 
@@ -1298,9 +1298,11 @@ _Bool ScanPath(char *Path)
 {
   _Bool                  Flag = False;        /* return value */
   _Bool                  Run = True;          /* control flag */
-  DIR                    *Directory;
-  struct dirent          *File;
-  struct stat            FileData;
+  DIR                    *Directory;          /* directory stream */
+  struct dirent          *File;               /* directory entry */
+  struct stat            FileData;            /* file details */
+  long                   FileCounter = 0;     /* file counter */
+  int                    Error;               /* error ID */
 
   /* sanity check */
   if (Path == NULL) return Flag;
@@ -1320,6 +1322,7 @@ _Bool ScanPath(char *Path)
     /* get all directory entries and check each name */
     while (Run)
     {
+      Error = errno;                 /* save current error ID */
       File = readdir(Directory);     /* get next file */
       if (File)                      /* got it */
       {
@@ -1331,15 +1334,20 @@ _Bool ScanPath(char *Path)
             /* add to global list */
             Flag = AddInfoElement(File->d_name, FileData.st_size, FileData.st_mtime);
 
-            if (Flag)
+            if (Flag)                   /* after adding */
             {
-              /* set file status */
-              if (MatchExcludeList(File->d_name))
-                Env->LastInfo->Status = STAT_EXCLUDED;
-              else
-                Env->LastInfo->Status = STAT_OK;
+              if (Env->LastInfo)        /* sanity check for pointer */
+              {
+                /* set file status */
+                if (MatchExcludeList(File->d_name))
+                  Env->LastInfo->Status = STAT_EXCLUDED;
+                else
+                  Env->LastInfo->Status = STAT_OK;
+              }
             }
+
             /* update statistics */
+            FileCounter++;
             Env->Files++;
             Env->Bytes += FileData.st_size;
           }
@@ -1348,6 +1356,15 @@ _Bool ScanPath(char *Path)
       else                           /* error or no more entries */
       {
         Run = False;                   /* end loop */
+
+        /* check for empty directory */
+        if (errno == Error)            /* no more entries */
+        {
+          if (FileCounter == 0)        /* no valid files found */
+          {
+            Flag = True;               /* signal success */
+          }
+        }
       }
     }
 
@@ -1371,9 +1388,10 @@ _Bool ScanPath(char *Path)
 _Bool ProcessPath(char *Name, char *Path, char *AreaInfo)
 {
   _Bool             Flag = False;       /* return value */
-  char              *DirBBS = NULL;
-  char              *Desc = NULL;
-  Info_Type         *Info, *Last;
+  char              *DirBBS = NULL;     /* description from dir.bbs */
+  char              *Desc = NULL;       /* area description */
+  Info_Type         *Info;              /* pointer to info list */
+  Info_Type         *Last = NULL;       /* pointer to last element in list */
   Field_Type        *Field;
   unsigned short    Limit;
 
@@ -1456,6 +1474,7 @@ _Bool ProcessPath(char *Name, char *Path, char *AreaInfo)
 
     /* files */
     Info = Env->InfoList;
+
     while (Info)                    /* follow list */
     {
       if (Info->Status & STAT_OK)   /* if ok to list  */
@@ -1473,6 +1492,7 @@ _Bool ProcessPath(char *Name, char *Path, char *AreaInfo)
    */
 
   if (DirBBS) free(DirBBS);
+
   if (Env->InfoList)               /* reset global list */
   {
     FreeInfoList(Env->InfoList);
@@ -2411,7 +2431,6 @@ _Bool Cmd_SharedFileArea(Token_Type *TokenList)
 
   if ((Run == False) || (Keyword > 0) || (Name == NULL) || (Path == NULL))
   {
-printf("%d - %d - %s - %s\n", Run, Keyword, Name, Path);
     Run = False;
     LogCfgError();
   }
