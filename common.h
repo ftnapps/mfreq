@@ -2,7 +2,7 @@
  *
  *   common header file
  *
- *   (c) 1994-2013 by Markus Reschke
+ *   (c) 1994-2015 by Markus Reschke
  *
  * ************************************************************************ */
 
@@ -36,10 +36,10 @@
 
 /* about */
 #define PROJECT          "mfreq"
-#define VERSION          "v3.13"
+#define VERSION          "v3.14"
 #define VERSION_MAJOR    3
-#define VERSION_MINOR    13
-#define COPYRIGHT        "(c) 1994-2014 by Markus Reschke"
+#define VERSION_MINOR    14
+#define COPYRIGHT        "(c) 1994-2015 by Markus Reschke"
 
 /* default paths */
 #define DEFAULT_CFG_PATH      "/etc/fido/mfreq"

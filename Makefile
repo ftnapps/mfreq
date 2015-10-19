@@ -1,6 +1,6 @@
 #
 # Makefile
-# (c) 1994-2013 by Markus Reschke
+# (c) 1994-2015 by Markus Reschke
 #
 
 
@@ -14,7 +14,7 @@ VERSION = $(subst ${NAME}-,,${DIST})
 
 # compiler flags
 CC = gcc
-CFLAGS = -Wall -g -I/usr/include -I. ${DEFINES}
+CFLAGS = -fstack-protector -Wall -g -I/usr/include -I. ${DEFINES}
 LDFLAGS =
 
 # libraries to link
