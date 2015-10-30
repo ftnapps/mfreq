@@ -2,7 +2,7 @@ Description: MFreq Makefile patch for Debian Packaging
  - Change PREFIX in upstream Makefile to '/usr' for package build.
  - Remove line in upstream Makefile stripping executables prior to installation.
 Author: Robert James Clay <jame@rocasa.us>
-Last-Update: <2013-12-18>
+Last-Update: <2015-10-30>
 
 --- a/Makefile
 +++ b/Makefile
@@ -10,9 +10,9 @@ Last-Update: <2013-12-18>
  
  # compiler flags
  CC = gcc
--CFLAGS = -Wall -g -I/usr/include -I. ${DEFINES}
+-CFLAGS = -fstack-protector -Wall -g -I/usr/include -I. ${DEFINES}
 -LDFLAGS =
-+CFLAGS += -Wall -g -I/usr/include -I. ${DEFINES}
++CFLAGS += -fstack-protector -Wall -g -I/usr/include -I. ${DEFINES}
 +LDFLAGS +=
  
  # libraries to link
