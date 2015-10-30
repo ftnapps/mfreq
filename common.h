@@ -36,10 +36,10 @@
 
 /* about */
 #define PROJECT          "mfreq"
-#define VERSION          "v3.11"
+#define VERSION          "v3.13"
 #define VERSION_MAJOR    3
-#define VERSION_MINOR    11
-#define COPYRIGHT        "(c) 1994-2013 by Markus Reschke"
+#define VERSION_MINOR    13
+#define COPYRIGHT        "(c) 1994-2014 by Markus Reschke"
 
 /* default paths */
 #define DEFAULT_CFG_PATH      "/etc/fido/mfreq"
@@ -80,8 +80,9 @@
 /* common */
 #define SW_NONE               0b0000000000000000  /* no switch set */
 #define SW_BINARY_SEARCH      0b0000000000000001  /* binary search */
-#define SW_SI_UNITS           0b0000000000000010  /* enable SI units (input) */
-#define SW_IEC_UNITS          0b0000000000000100  /* enable IEC units (output) */
+#define SW_ANY_CASE           0b0000000000000010  /* case-insensitive file matching */
+#define SW_SI_UNITS           0b0000000000000100  /* enable SI units (input) */
+#define SW_IEC_UNITS          0b0000000000001000  /* enable IEC units (output) */
 /* index */
 #define SW_PATH_ALIASES       0b0000000000010000  /* create path aliases */
 /* frequest */
@@ -90,10 +91,7 @@
 #define SW_TYPE_2             0b0000010000000000  /* packet type-2 */
 #define SW_TYPE_2PLUS         0b0000100000000000  /* packet type-2+ */
 #define SW_SEND_TEXT          0b0001000000000000  /* send response text file */
-#define SW_ANY_CASE           0b0010000000000000  /* case-insensitive file matching */
-#define SW_LOG_REQUEST        0b0100000000000000  /* extensive logging */
-
-
+#define SW_LOG_REQUEST        0b0010000000000000  /* extensive logging */
 
 /* file flags (bitmask, 16 bits) */
 #define FILE_NONE             0b0000000000000000  /* no flag set */
@@ -130,7 +128,6 @@
 #define INFO_DIR_BBS          0b0000000000010000  /* dir.bbs */
 #define INFO_FILES_BBS        0b0000000000100000  /* files.bbs */
 #define INFO_DESCRIPT_ION     0b0000000001000000  /* descript.ion */
-
 
 /* file info fields */
 #define FIELD_NONE            0    /* no type */
@@ -245,8 +242,8 @@ typedef struct aka
 /* index definition (linked list) */
 typedef struct index
 {
-  char              *Filepath;          /* filepath of index files */
-  /* todo: add conditions */
+  char              *Filepath;          /* filepath of file index */
+  char              *MountingPoint;     /* mounting point */
   struct index      *Next;              /* pointer to next element */
 } Index_Type;
 

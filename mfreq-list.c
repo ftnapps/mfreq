@@ -2,7 +2,7 @@
  *
  *   mfreq-list
  *
- *   (c) 1994-2013 by Markus Reschke
+ *   (c) 1994-2015 by Markus Reschke
  *
  * ************************************************************************ */
 
@@ -633,6 +633,11 @@ _Bool WriteInfo(FILE *File, Info_Type *Info, Field_Type **Fields, unsigned short
 /*
  *  parse files.bbs
  *
+ *  requires:
+ *  - pointer to input buffer
+ *  - line number
+ *  - address of pointer of current fileinfo element 
+ *
  *  returns:
  *  - 1 on success
  *  - 0 on error
@@ -844,7 +849,7 @@ _Bool Parse_files_bbs(char *Buffer, unsigned int Line, Info_Type **CurrentInfo)
               *CurrentInfo = Info;
             }
           }
-          else
+          else                   /* info available */
           {
             *CurrentInfo = Info;
           }
@@ -1006,7 +1011,7 @@ _Bool Read_files_bbs(char *Path)
   unsigned short    Check;
   FILE              *File;              /* files.bbs stream */
   size_t            Length;
-  Info_Type         *Info = NULL;
+  Info_Type         *Info = NULL;       /* fileinfo element */
   unsigned int      Line = 0;           /* line number */
 
   /* sanity check */
@@ -1293,9 +1298,11 @@ _Bool ScanPath(char *Path)
 {
   _Bool                  Flag = False;        /* return value */
   _Bool                  Run = True;          /* control flag */
-  DIR                    *Directory;
-  struct dirent          *File;
-  struct stat            FileData;
+  DIR                    *Directory;          /* directory stream */
+  struct dirent          *File;               /* directory entry */
+  struct stat            FileData;            /* file details */
+  long                   FileCounter = 0;     /* file counter */
+  int                    Error;               /* error ID */
 
   /* sanity check */
   if (Path == NULL) return Flag;
@@ -1315,6 +1322,7 @@ _Bool ScanPath(char *Path)
     /* get all directory entries and check each name */
     while (Run)
     {
+      Error = errno;                 /* save current error ID */
       File = readdir(Directory);     /* get next file */
       if (File)                      /* got it */
       {
@@ -1326,15 +1334,20 @@ _Bool ScanPath(char *Path)
             /* add to global list */
             Flag = AddInfoElement(File->d_name, FileData.st_size, FileData.st_mtime);
 
-            if (Flag)
+            if (Flag)                   /* after adding */
             {
-              /* set file status */
-              if (MatchExcludeList(File->d_name))
-                Env->LastInfo->Status = STAT_EXCLUDED;
-              else
-                Env->LastInfo->Status = STAT_OK;
+              if (Env->LastInfo)        /* sanity check for pointer */
+              {
+                /* set file status */
+                if (MatchExcludeList(File->d_name))
+                  Env->LastInfo->Status = STAT_EXCLUDED;
+                else
+                  Env->LastInfo->Status = STAT_OK;
+              }
             }
+
             /* update statistics */
+            FileCounter++;
             Env->Files++;
             Env->Bytes += FileData.st_size;
           }
@@ -1343,6 +1356,15 @@ _Bool ScanPath(char *Path)
       else                           /* error or no more entries */
       {
         Run = False;                   /* end loop */
+
+        /* check for empty directory */
+        if (errno == Error)            /* no more entries */
+        {
+          if (FileCounter == 0)        /* no valid files found */
+          {
+            Flag = True;               /* signal success */
+          }
+        }
       }
     }
 
@@ -1366,9 +1388,10 @@ _Bool ScanPath(char *Path)
 _Bool ProcessPath(char *Name, char *Path, char *AreaInfo)
 {
   _Bool             Flag = False;       /* return value */
-  char              *DirBBS = NULL;
-  char              *Desc = NULL;
-  Info_Type         *Info, *Last;
+  char              *DirBBS = NULL;     /* description from dir.bbs */
+  char              *Desc = NULL;       /* area description */
+  Info_Type         *Info;              /* pointer to info list */
+  Info_Type         *Last = NULL;       /* pointer to last element in list */
   Field_Type        *Field;
   unsigned short    Limit;
 
@@ -1451,6 +1474,7 @@ _Bool ProcessPath(char *Name, char *Path, char *AreaInfo)
 
     /* files */
     Info = Env->InfoList;
+
     while (Info)                    /* follow list */
     {
       if (Info->Status & STAT_OK)   /* if ok to list  */
@@ -1468,6 +1492,7 @@ _Bool ProcessPath(char *Name, char *Path, char *AreaInfo)
    */
 
   if (DirBBS) free(DirBBS);
+
   if (Env->InfoList)               /* reset global list */
   {
     FreeInfoList(Env->InfoList);
@@ -2406,7 +2431,6 @@ _Bool Cmd_SharedFileArea(Token_Type *TokenList)
 
   if ((Run == False) || (Keyword > 0) || (Name == NULL) || (Path == NULL))
   {
-printf("%d - %d - %s - %s\n", Run, Keyword, Name, Path);
     Run = False;
     LogCfgError();
   }
@@ -2717,6 +2741,8 @@ _Bool Cmd_Reset(Token_Type *TokenList)
 
       case 2:       /* InfoMode */
         Env->InfoMode = INFO_NONE;      /* set switches to default */
+        /* unset bits for local switches set by InfoMode */
+        Env->CfgSwitches &= ~(SW_SI_UNITS | SW_IEC_UNITS | SW_ANY_CASE);
         break;
 
       case 3:       /* Excludes */
@@ -2753,7 +2779,7 @@ _Bool Cmd_Reset(Token_Type *TokenList)
 /*
  *  file info mode
  *  Syntax: InfoMode [dir.bbs] [files.bbs] [Update] [Strict] |Skips]
- *                   [Relax] [SI-Units] [IEC-Units]
+ *                   [Relax] [SI-Units] [IEC-Units] |AnyCase]
  *
  *  returns:
  *  - 1 on success
@@ -2767,9 +2793,9 @@ _Bool Cmd_InfoMode(Token_Type *TokenList)
   unsigned short         Keyword = 0;        /* keyword ID */
   unsigned short         Mode = INFO_NONE;
   unsigned short         Switches = SW_NONE;
-  static char            *Keywords[10] =
+  static char            *Keywords[11] =
     {"InfoMode", "dir.bbs", "files.bbs", "Update", "Strict",
-     "Skips", "Relax", "SI-Units", "IEC-Units", NULL};
+     "Skips", "Relax", "SI-Units", "IEC-Units", "AnyCase", NULL};
 
   /* sanity check */
   if (TokenList == NULL) return Flag;
@@ -2829,6 +2855,10 @@ _Bool Cmd_InfoMode(Token_Type *TokenList)
       case 9:       /* IEC units for output */
         Switches |= SW_IEC_UNITS;
         break;
+
+      case 10:      /* any case */
+        Switches |= SW_ANY_CASE;
+        break;
     }
 
     TokenList = TokenList->Next;     /* goto to next token */
@@ -2846,8 +2876,8 @@ _Bool Cmd_InfoMode(Token_Type *TokenList)
   else                        /* success */
   {
     Env->InfoMode = Mode;               /* set new infomode */
-    /* unset bits for local switches */
-    Env->CfgSwitches &= ~(SW_SI_UNITS | SW_IEC_UNITS);
+    /* unset bits for local switches set by InfoMode */
+    Env->CfgSwitches &= ~(SW_SI_UNITS | SW_IEC_UNITS | SW_ANY_CASE);
     Env->CfgSwitches |= Switches;       /* update switches */
     Flag = True;
   }

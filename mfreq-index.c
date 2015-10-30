@@ -2,7 +2,7 @@
  *
  *   mfreq-index
  *
- *   (c) 1994-2013 by Markus Reschke
+ *   (c) 1994-2015 by Markus Reschke
  *
  * ************************************************************************ */
 
@@ -915,6 +915,7 @@ _Bool Cmd_Index(Token_Type *TokenList)
   if (Run)
   {
     Run = False;                               /* reset flag */
+    LastData = NULL;                           /* reset pointer */
 
     IndexData = MergeSort(Env->DataList, &LastData);   /* sort */
     Env->DataList = IndexData;                 /* update list start */

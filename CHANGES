@@ -2,9 +2,38 @@
 
                            Changes for mfreq-suite
 
-                       (c) 2012-2013 by Markus Reschke
+                       (c) 2012-2015 by Markus Reschke
 
 ------------------------------------------------------------------------------
+
+* 2015-10 / Version 3.14
+
+mfreq-list:
+  - Bug fix: when scanning an empty file area mfreq-list stopped processing. 
+    (reported by Eric Renfro 1:135/371)
+
+all:
+  - Compatibility check for 64 bit systems.
+
+
+* 2014-10 / Version 3.13
+
+mfreq-list:
+  - Added support for case-insensitive filenames in files.bbs (InfoMode
+    AnyCase switch).
+
+
+* 2014-06 / Version 3.12
+
+all:
+  - updated sample config files
+
+mfreq-srif:
+  - Added the IfMounted condition to the Index setting to support removable
+    media, like USB disks or network drives.
+  - Changed the request limit setting to support "-1" for a unlimited number
+    of files or bytes.  
+
 
 * 2013-12 / Version 3.11
 
@@ -46,14 +75,14 @@ mfreq-srif:
   - Fixed linenumber bug in error reporting for the configuration file. 
 
 
-* 2012-03 / Version 3.08
+* 2013-03 / Version 3.08
 
 mfreq-index:
   - Added smart magic feature to select files matching specific condititions
     as a magic. Namepattern and latest filedate are currently supported.
 
 
-* 2012-02 / Version 3.07
+* 2013-02 / Version 3.07
 
 all:
   - Changed setup of configuration path and temp path to support global

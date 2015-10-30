@@ -2,7 +2,7 @@
  *
  *   functions for request specific data management
  *
- *   (c) 1994-2013 by Markus Reschke
+ *   (c) 1994-2014 by Markus Reschke
  *
  * ************************************************************************ */
 
@@ -47,6 +47,7 @@ void FreeIndexList(Index_Type *List)
 
     /* free data */
     if (List->Filepath) free(List->Filepath);
+    if (List->MountingPoint) free(List->MountingPoint);
 
     /* free structure */
     free(List);
@@ -65,7 +66,7 @@ void FreeIndexList(Index_Type *List)
  *  - 0 on error
  */
 
-_Bool AddIndexElement(char *Filepath)
+_Bool AddIndexElement(char *Filepath, char *MountingPoint)
 {
   _Bool               Flag = False;        /* return value */
   Index_Type          *Element;            /* new element */
@@ -82,6 +83,10 @@ _Bool AddIndexElement(char *Filepath)
 
     /* copy data */
     Element->Filepath = CopyString(Filepath);
+    if (MountingPoint)
+      Element->MountingPoint = CopyString(MountingPoint);
+    else
+      Element->MountingPoint = NULL;      
 
     /* add new element to list */
     if (Env->LastIndex) Env->LastIndex->Next = Element;      /* just link */
