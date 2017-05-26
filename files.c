@@ -2,7 +2,7 @@
  *
  *   functions for file specific data management
  *
- *   (c) 2013 by Markus Reschke
+ *   (c) 2015 by Markus Reschke
  *
  * ************************************************************************ */
 

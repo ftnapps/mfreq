@@ -2,7 +2,7 @@
  *
  *   functions for request specific data management
  *
- *   (c) 1994-2014 by Markus Reschke
+ *   (c) 1994-2015 by Markus Reschke
  *
  * ************************************************************************ */
 

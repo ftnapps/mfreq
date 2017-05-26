@@ -1,6 +1,6 @@
 #
 # Makefile
-# (c) 1994-2015 by Markus Reschke
+# (c) 1994-2017 by Markus Reschke
 #
 
 
@@ -21,7 +21,10 @@ LDFLAGS =
 LIBS =
 
 # where to install stuff
+# DESTDIR may be set by some packager
 PREFIX = /usr/local
+BINDIR=${DESTDIR}${PREFIX}/bin
+
 
 # objects
 OBJ_COMMON = log.o misc.o tokenizer.o
@@ -74,7 +77,7 @@ dist: ${PROGS}
 	cd ..; tar -czf ${DIST}/${DIST}.tgz \
           ${DIST}/*.h ${DIST}/*.c ${DIST}/Makefile \
           ${DIST}/README ${DIST}/CHANGES ${DIST}/*.pdf \
-          ${DIST}/sample-cfg \
+          ${DIST}/sample-cfg ${DIST}/mfreq.spec \
 	  ${DIST}/mfreq-index ${DIST}/mfreq-srif ${DIST}/mfreq-list
 
 
@@ -84,9 +87,9 @@ dist: ${PROGS}
 
 install: ${PROGS}
 	strip ${PROGS}
-	cp -f mfreq-index ${PREFIX}/bin
-	cp -f mfreq-list ${PREFIX}/bin
-	cp -f mfreq-srif ${PREFIX}/bin
+	cp -f mfreq-index ${BINDIR}/
+	cp -f mfreq-list ${BINDIR}/
+	cp -f mfreq-srif ${BINDIR}/
 
 
 #

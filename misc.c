@@ -2,7 +2,7 @@
  *
  *   misc support functions
  *
- *   (c) 2012-2014 by Markus Reschke
+ *   (c) 2012-2015 by Markus Reschke
  *
  * ************************************************************************ */
 

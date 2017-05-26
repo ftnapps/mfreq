@@ -2,7 +2,7 @@
  *
  *   functions header file
  *
- *   (c) 1994-2014 by Markus Reschke
+ *   (c) 1994-2015 by Markus Reschke
  *
  * ************************************************************************ */
 

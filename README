@@ -3,9 +3,11 @@
 
                             ReadMe for mfreq suite
 
-                       (c) 1994-2015 by Markus Reschke
+                       (c) 1994-2016 by Markus Reschke
 
 ------------------------------------------------------------------------------
+
+Last edit: 2017-05-26
 
 
 * About
@@ -297,7 +299,7 @@ memory contraints or you need different file indexes for whatever reason.
 * ToDo / Feature Requests
 
 Some stuff which needs to be fixed or would be nice to have:
-  - All done :-)
+  - Verbose logging (including cfg switch)?
 
 
 
@@ -644,13 +646,13 @@ the Relax switch may cause a lot of warnings being logged. If you set Relax
 and Update you can convert file descriptions files into the desired format. 
 
 When you got issues with the case-sensitivity of filenames on disk and in the
-file description file you can enable AnyCase to match the filenames case-
-insensitive. For example if the filenames on disk are lower case and the
+file description file, you can enable AnyCase to match the filenames case-
+insensitive. For example, if the filenames on disk are lower case and the
 filenames in the files.bbs are upper case. Make sure that you don't got any
 filename doubles when case-insensitive matching is applied. For double
-filenameson disk the first one found will get the file description. Any other
+filenames on disk the first one found will get the file description. Any other
 double is treated as a new file not in the file description file yet. If you
-got doubles in the file description file all descriptions of all doubles will
+got doubles in the file description file, all descriptions of all doubles will
 be added to the first matching filename found on disk.
  
 The SI-Units switch enables metric unit prefixes for any input and output, i.e.
@@ -715,6 +717,7 @@ Some stuff which needs to be fixed or would be nice to have:
   - Support of descript.ion?
   - Support file_id.diz? Try to extract?
   - Ignore a missing directory and keep processing?
+  - Verbose logging (including cfg switch)?
 
 
 
@@ -766,7 +769,7 @@ will be not followed.
 All FTS addresses (AKAs) will be normalized into following format:
   <zone>:<net>/<node>.<point>[@<domain>]
 
-The <domain> part is optional. Nodes get 0 as point number.
+The <domain> part is optional and nodes get point number 0.
 
 
 * Requests
@@ -869,6 +872,9 @@ With SetMode you enable following features:
   LogRequest     log file requests in more detail
   SI-Units       enable SI byte units
   IEC-Units      enable IEC byte units output  
+
+When netmail response is enabled, but the SRIF lacks the sysop name, the
+setting is automatically changed into textmail.
 
 Please set the RemoveReq switch if your mailer doesn't delete the request file
 after calling the frequest handler.
@@ -1026,7 +1032,7 @@ you should have created a dedicated index with mfreq-index before.
 
 Some stuff which needs to be fixed or would be nice to have:
   - Support Time setting in SRIF file?
-
+  - Exit if a maximum runtime is exceeded?
 
 
 ------------------------------------------------------------------------------
@@ -1043,9 +1049,9 @@ Format of entries in the log file:
 * Latest Version
 
 The latest version is available via:
-  - frequest at 2:240/1661 (magic MFREQ)
-  - GIT at sourceforge.net/p/ftnapps/mfreq
+  - frequest from 2:240/1661 (magic MFREQ)
   - GIT at https://github.com/ftnapps/mfreq
+  - GIT at sourceforge.net/p/ftnapps/mfreq (outdated)
 
 
 * Forks & Other OSs

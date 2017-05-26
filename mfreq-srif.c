@@ -2,7 +2,7 @@
  *
  *   mfreq-srif (SRIF compatible frequest handler based on fsc-0086.001)
  *
- *   (c) 1994-2014 by Markus Reschke
+ *   (c) 1994-2017 by Markus Reschke
  *
  * ************************************************************************ */
 
@@ -1227,7 +1227,7 @@ _Bool SearchIndex(FILE *DataFile, FILE *AliasFile, Request_Type *Request, int Po
  *  requires:
  *  - Request: requested file/pattern
  *  - Pos: position of first wildcard (-1: no wildcards)
- *  - Letter: first char (case-insensitive search)
+ *  - Letter: first char
  *
  *  returns:
  *  - offset on success
@@ -1257,7 +1257,7 @@ off_t BinaryPreSearch(FILE *DataFile, FILE *OffsetFile, char *Request, int Pos, 
       (Pos == 0))
     return Offset;
 
-  /* update flag for case insensitive search */
+  /* check for case insensitive search */
   if (Env->CfgSwitches & SW_ANY_CASE) AnyCase = True;
 
 
@@ -1272,7 +1272,6 @@ off_t BinaryPreSearch(FILE *DataFile, FILE *OffsetFile, char *Request, int Pos, 
   {
     Start = LookupElement->Start;
     Stop = LookupElement->Stop;
-
     Run = True;                    /* ok to proceed */
   }
 
@@ -1292,7 +1291,6 @@ off_t BinaryPreSearch(FILE *DataFile, FILE *OffsetFile, char *Request, int Pos, 
   while (Run)
   {
     Middle = (Stop + Start) / 2;      /* determine middle */
-
 
     /*
      *  get offset for middle filename from offset file
@@ -1351,7 +1349,8 @@ off_t BinaryPreSearch(FILE *DataFile, FILE *OffsetFile, char *Request, int Pos, 
 
     if (Run)
     {
-      Test = Stop - Start + 1;     /* number of files */
+      Test = Stop - Start + 1;          /* number of files */
+      if (Start == Middle) Test = 1;    /* special break condition */
 
       /* case insensitive search */
       if (AnyCase)
@@ -1407,8 +1406,9 @@ off_t BinaryPreSearch(FILE *DataFile, FILE *OffsetFile, char *Request, int Pos, 
 
 _Bool ProcessRequest()
 {
-  _Bool             Flag = False;            /* return value */
+  _Bool             Flag = True;             /* return value */
   _Bool             Run;                     /* loop control */
+  _Bool             Result;                  /* result flag */
   _Bool             AnyCase = False;         /* case insensitive search */
   _Bool             BinSearch = False;       /* binary search */
   Index_Type        *Index;                  /* file index list */
@@ -1432,7 +1432,12 @@ _Bool ProcessRequest()
    */
 
   Index = Env->IndexList;
-  if (Index == NULL) Log(L_WARN, "No fileindex specified!");
+  if (Index == NULL)
+  {
+    Log(L_WARN, "No fileindex specified!");
+    Flag = False;                            /* signal error */
+  }
+
 
   while (Index)               /* follow index list */
   {
@@ -1451,7 +1456,10 @@ _Bool ProcessRequest()
     {
       /* check if filesystem is mounted */
       Run = IsMountingPoint(Index->MountingPoint);
-      if (!Run) Log(L_WARN, "Skipped index (%s): fs not mounted", Index->Filepath);
+      if (!Run)
+      {
+        Log(L_WARN, "Skipped index (%s): fs not mounted", Index->Filepath);
+      }
     }
 
 
@@ -1504,6 +1512,8 @@ _Bool ProcessRequest()
       {
         Log(L_WARN, "Couldn't open index data file (%s)!", Index->Filepath);
       }
+
+      if (!Run) Flag = False;                /* signal error */
     }
 
 
@@ -1558,7 +1568,8 @@ _Bool ProcessRequest()
           /* set start position */
           if (fseek(DataFile, Offset, SEEK_SET) == 0) 
           {
-            Flag = SearchIndex(DataFile, AliasFile, Request, Pos);
+            Result = SearchIndex(DataFile, AliasFile, Request, Pos);
+            if (!Result) Flag = False;            /* signal error */
           }
         }
 
@@ -1586,7 +1597,8 @@ _Bool ProcessRequest()
             /* set start position */
             if (fseek(DataFile, Offset, SEEK_SET) == 0)
             {
-              Flag = SearchIndex(DataFile, AliasFile, Request, Pos);
+              Result = SearchIndex(DataFile, AliasFile, Request, Pos);
+              if (!Result) Flag = False;          /* signal error */
             }
           }
         }
@@ -1734,14 +1746,14 @@ _Bool ReadRequest()
     }
 
     fclose(File);           /* close file */
+
+    /* log problem */
+    if (!Flag) Log(L_WARN, "Couldn't read request file!");
   }
   else
   {
     Log(L_WARN, "Couldn't open request file (%s)!", Env->RequestFilepath);
   }
-
-  /* log problem */
-  if (!Flag) Log(L_WARN, "Couldn't read request file!");
 
   return Flag;
 }
@@ -1912,6 +1924,7 @@ _Bool ReadSRIF()
   Token_Type             *TokenList;
 
   File = fopen(Env->SRIF_Filepath, "r");         /* read mode */
+
   if (File)
   {
     while (Run)
@@ -1944,7 +1957,8 @@ _Bool ReadSRIF()
             InBuffer[Length - 1] = 0;
             Length--;
           }
-          /* if it's not an empty */
+
+          /* if it's not an empty line */
           if (InBuffer[0] != 0)
           {
             TokenList = Tokenize(InBuffer);          /* tokenize line */
@@ -1965,14 +1979,14 @@ _Bool ReadSRIF()
     }
 
     fclose(File);           /* close file */
+
+    /* log problem */
+    if (!Flag) Log(L_WARN, "Couldn't read SRIF!");
   }
   else
   {
     Log(L_WARN, "Couldn't open SRIF file (%s)!", Env->SRIF_Filepath);
   }
-
-  /* log problem */
-  if (!Flag) Log(L_WARN, "Couldn't read SRIF!");
 
   return Flag;
 }
@@ -1993,8 +2007,11 @@ _Bool CheckSRIF()
 
   /* we don't care obout Baud, Time, RemoteStatus and SystemStatus */
 
-  if (Env->RequestFilepath && Env->ResponseFilepath &&
-      Env->Sysop && Env->ReqAKA)
+  /*
+   *  we require request file, response file and one AKA
+   */
+
+  if (Env->RequestFilepath && Env->ResponseFilepath && Env->ReqAKA)
   {
     Flag = True;
   }
@@ -2003,7 +2020,26 @@ _Bool CheckSRIF()
     Log(L_WARN, "Required settings are missing in SRI file!");
   }
 
- return Flag;
+
+  /*
+   *  missing sysop
+   */
+
+  if (Env->Sysop == NULL)
+  {
+    /* in case we should send a netmail */
+    if (Env->CfgSwitches & SW_SEND_NETMAIL)
+    {
+      /* change that into a textmail */
+      Env->CfgSwitches |= SW_SEND_TEXT;           /* enable textmail */
+      Env->CfgSwitches &= ~SW_SEND_NETMAIL;       /* disable netmail */
+    }
+
+    /* set pseudo name for logging */
+    Env->Sysop = CopyString("Sysop");
+  }
+
+  return Flag;
 }
 
 

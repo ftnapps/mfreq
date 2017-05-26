@@ -2,9 +2,23 @@
 
                            Changes for mfreq-suite
 
-                       (c) 2012-2015 by Markus Reschke
+                       (c) 2012-2017 by Markus Reschke
 
 ------------------------------------------------------------------------------
+
+* 2017-05 / Version 3.15
+
+all:
+  - Modified Makefile to support DESTDIR.
+  - RPM spec file (provided by Eric Renfro 1:135/371).
+
+mfreq-srif:
+  - Allow missing sysop name in SRIF. If NetMail is enabled it's changed
+    automatically into TextMail.
+  - Fixed issue with error reporting in ProcessRequest().
+  - Fixed error in BinaryPreSearch() which caused an endless loop in a
+    specific situation.
+
 
 * 2015-10 / Version 3.14
 
