@@ -2,7 +2,7 @@
  *
  *   mfreq-index
  *
- *   (c) 1994-2015 by Markus Reschke
+ *   (c) 1994-2017 by Markus Reschke
  *
  * ************************************************************************ */
 
@@ -471,7 +471,8 @@ _Bool ProcessPath(char *Path, char *PW, int Depth, _Bool AutoMagic)
 {
   _Bool                  Flag = False;       /* return value */
   _Bool                  Run = True;         /* control flag */
-  _Bool                  AliasFlag = False;  /* flag for path aliases */
+  _Bool                  AliasFlag = False;  /* path aliases */
+  _Bool                  AnyCase = False;    /* case-insensive search */
   DIR                    *Directory;
   struct dirent          *File;
   struct stat            FileData;
@@ -484,6 +485,9 @@ _Bool ProcessPath(char *Path, char *PW, int Depth, _Bool AutoMagic)
 
   /* sanity check */
   if ((Path == NULL) || (Depth < 0)) return Flag;
+
+  /* case-insensive search */
+  if (Env->CfgSwitches & SW_ANY_CASE) AnyCase = True;
 
   /* build absolute path if necessary */
   if (Path[0] != '/')      /* relative path */
@@ -567,16 +571,30 @@ _Bool ProcessPath(char *Path, char *PW, int Depth, _Bool AutoMagic)
               /* omit filename (automatic filepath) */ 
               if (AliasFlag)            /* path alias enabled */
               {
-                /* create aliased path */
-                /* format: %<offset>%/ */
+                /* create aliased path without filename */
+                /* format: %<alias offset>%/ */
                 snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
                   "%%%ld%%/", AliasOffset);
               }
               else                      /* path alias disabled */
               {
-                /* create full path */
+                /* create full path whithout filename */
                 snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
                   "%s/", Path);
+              }
+
+              if (AnyCase)              /* case-insensitive search */
+              {
+                /*
+                 *  For AnyCase we have to convert the filename to uppper case
+                 *  later on. So we need to add the original filename to the path.
+                 */
+
+                /* add filename to path */
+                Length = strlen(TempBuffer);
+                Help = &TempBuffer[Length];       /* end of path */
+                snprintf(Help, DEFAULT_BUFFER_SIZE - 1 - Length,
+                    "%s", TempBuffer2);                
               }
 
               Flag = AddDataElement(TempBuffer2, TempBuffer, PW);
@@ -598,11 +616,12 @@ _Bool ProcessPath(char *Path, char *PW, int Depth, _Bool AutoMagic)
                 {
                   /* add filename to path */
                   Length = strlen(TempBuffer);
-                  Help = &TempBuffer[Length];    /* pointer to end of string */
+                  Help = &TempBuffer[Length];    /* end of path */
                   snprintf(Help, DEFAULT_BUFFER_SIZE - 1 - Length,
                     "%s", TempBuffer2);
 
                   LastDot[0] = 0;            /* create sub-string */
+
                   Flag = AddDataElement(TempBuffer2, TempBuffer, PW); 
                 }
               }
@@ -747,6 +766,327 @@ _Bool ScanPath(char *Path, char *Pattern)
 
 
 /*
+ *  write index
+ *
+ *  returns:
+ *  - 1 on success
+ *  - 0 on error
+ */
+
+_Bool WriteIndex(char *Filepath)
+{
+  _Bool             Flag = False;            /* return value */
+  _Bool             Run = True;              /* control flag */
+  IndexData_Type    *IndexData = NULL;       /* data list */
+  IndexData_Type    *LastData;               /* last element in data list */
+  IndexLookup_Type  *IndexLookup = NULL;     /* lookup list */
+  IndexAlias_Type   *IndexAlias = NULL;      /* alias list */
+  FILE              *DataFile = NULL;        /* index data file */
+  FILE              *LookupFile = NULL;      /* index lookup file */
+  FILE              *AliasFile = NULL;       /* index alias file */
+  FILE              *OffsetFile = NULL;      /* index offset file */
+  _Bool             DataLock = False;        /* data file locked */
+  _Bool             LookupLock = False;      /* lookup file locked */
+  _Bool             AliasLock = False;       /* alias file locked */
+  _Bool             OffsetLock = False;      /* offset file locked */
+  char              FirstChar = 0;           /* first char of filename */
+  unsigned int      Counter = 0;             /* filename/line counter */
+  off_t             Offset;                  /* file offset */
+  char              *Help;
+  _Bool             OffsetFlag = False;      /* flag for binary search mode */
+
+  /* sanity check */
+  if (Filepath == NULL) return False;
+
+  /* update flag for binary search (create offset file) */
+  if (Env->CfgSwitches & SW_BINARY_SEARCH) OffsetFlag = True;
+
+
+  /*
+   *  sort data
+   */
+
+  if (Run)
+  {
+    Run = False;                               /* reset flag */
+    LastData = NULL;                           /* reset pointer */
+
+    IndexData = MergeSort(Env->DataList, &LastData);   /* sort */
+    Env->DataList = IndexData;                 /* update list start */
+    Env->LastData = LastData;                  /* update list end */
+
+    if (IndexData != NULL) Run = True;         /* ok for next part */
+  }
+
+
+  /*
+   *  open index files
+   */
+
+  if (Run)
+  {
+    Run = False;                                /* reset flag */
+
+    /* data file */
+    snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
+      "%s."SUFFIX_DATA, Filepath);
+    DataFile = fopen(TempBuffer, "w");       /* truncate & write mode */
+
+    /* lookup file (binary search) */
+    snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
+      "%s."SUFFIX_LOOKUP, Filepath);
+    LookupFile = fopen(TempBuffer, "w");     /* truncate & write mode */
+
+    /* alias file */
+    snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
+      "%s."SUFFIX_ALIAS, Filepath);
+    AliasFile = fopen(TempBuffer, "w");      /* truncate & write mode */
+
+    /* offset file */
+    snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
+      "%s."SUFFIX_OFFSET, Filepath);
+    OffsetFile = fopen(TempBuffer, "w");     /* truncate & write mode */
+
+    /* check */
+    if (DataFile && LookupFile && AliasFile && OffsetFile)
+    {
+      Run = True;                  /* ok for next part */
+    }
+    else
+    {
+      Log(L_WARN, "Can't open index files (%s)!", Filepath);
+    }
+  }
+
+
+  /*
+   *  lock index files
+   */
+
+  if (Run)
+  {
+    Run = False;                             /* reset flag */
+
+    /* lock files */
+    DataLock = LockFile(DataFile, NULL);
+    LookupLock = LockFile(LookupFile, NULL);
+    AliasLock = LockFile(AliasFile, NULL);
+    OffsetLock = LockFile(OffsetFile, NULL);
+
+    /* check */
+    if (DataLock && LookupLock && AliasLock && OffsetLock)
+    {
+      Run = True;                  /* ok for next part */
+    }
+    else
+    {
+      Log(L_WARN, "Can't lock index files (%s)!", Filepath);
+    }
+  }
+
+
+  /*
+   *  write data file and optional offset file
+   *  also build lookup list
+   *
+   *  format: <name>0x1F<filepath>[0x1F<password>]LF
+   *  We use the ascii unit separator 31 (octal 037) as field separator.
+   *  <filepath>: <path>/[<filename>] or %<alias offset>%/[filename]
+   *  - %<alias offset>% for automatic path aliasing
+   *  - <filename> can be omitted if same as <name>
+   */
+
+  if (Run)
+  {
+    while (IndexData)                   /* follow list */
+    {
+      Counter++;              /* another file */
+
+      /* catch change of first letter */
+      if (IndexData->Name[0] != FirstChar)
+      {
+        /* update last line counter for old character */
+        IndexLookup = Env->LastLookup;     /* get current pointer */
+        if (IndexLookup) IndexLookup->Stop = Counter - 1;
+
+        FirstChar = IndexData->Name[0];    /* save new character */
+
+        /* add lookup element for new character */
+        Offset = ftello(DataFile);      /* get current offset of the data file */
+        AddLookupElement(FirstChar, Offset, Counter, 0);
+      }
+
+      /*
+       *  write offset file (BinarySearch)
+       *  format: <binary offset>
+       */
+
+      if (OffsetFlag)
+      {
+        Offset = ftello(DataFile);      /* get current offset of the data file */
+
+        /* write offset of the data file to the offset file */
+        if (fwrite(&Offset, sizeof(off_t), 1, OffsetFile) != 1)
+        {
+          Run = False;               /* signal problem */
+          IndexData = NULL;          /* end loop */
+          Log(L_WARN, "Write error for index offset file (%s)!", Filepath);
+        }
+      }
+
+      /*
+       *  write data file
+       */
+
+      /* build data buffer */
+      if (IndexData->PW)           /* password required */
+      {
+        snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
+          "%s\037%s\037%s\n", IndexData->Name, IndexData->Filepath, IndexData->PW);
+      }
+      else                         /* no password */
+      {
+        snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
+          "%s\037%s\n", IndexData->Name, IndexData->Filepath);
+      }
+
+      IndexData = IndexData->Next;      /* go to next element */
+
+      /* and write to data file */
+      if (fputs(OutBuffer, DataFile) < 0)    /* got an error */
+      {
+        Run = False;               /* signal problem */
+        IndexData = NULL;          /* end loop */
+        Log(L_WARN, "Write error for index data file (%s)!", Filepath);
+      }
+
+      /* check for counter overflow */
+      if (Counter >= 1000000)      /* keep it reasonable, not UINT_MAX */
+      {
+        Run = False;               /* signal problem */
+        IndexData = NULL;          /* end loop */
+        Log(L_WARN, "Fileindex overrun (%s)!", Filepath);
+      } 
+    }
+
+    /* update stop line# of last char */
+    if (Run)
+    {
+      IndexLookup = Env->LastLookup;     /* get current pointer */
+      if (IndexLookup) IndexLookup->Stop = Counter;
+    } 
+  }
+
+
+  /*
+   *  write lookup file
+   *
+   *  format: <char> <file offset> <start line#> <stop line#>LF
+   */
+
+  if (Run)
+  {
+    IndexLookup = Env->LookupList;
+
+    while (IndexLookup)            /* follow list */
+    {
+      /* build data buffer */
+      snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
+        "%c %ld %u %u\n", IndexLookup->Letter, IndexLookup->Offset,
+        IndexLookup->Start, IndexLookup->Stop);
+      
+      IndexLookup = IndexLookup->Next;     /* go to next element */
+
+      if (fputs(OutBuffer, LookupFile) < 0)    /* got an error */
+      {
+        Run = False;
+        IndexLookup = NULL;
+        Log(L_WARN, "Write error for index lookup file (%s)!", Filepath);
+      }
+    }
+  }
+
+
+  /*
+   *  write alias file
+   *
+   *  format: <path>LF
+   *  To access the paths later on the offsets to the paths are stored as aliases
+   *  in the data file.
+   */
+
+  if (Run)
+  {
+    IndexAlias = Env->AliasList;
+
+    while (IndexAlias)             /* follow list */
+    {
+      /* build data buffer */
+      snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1, "%s\n", IndexAlias->Path);
+      
+      IndexAlias = IndexAlias->Next;         /* go to next element */
+
+      if (fputs(OutBuffer, AliasFile) < 0)   /* got an error */
+      {
+        Run = False;
+        IndexAlias = NULL;
+        Log(L_WARN, "Write error for index alias file (%s)!", Filepath);
+      }
+    }
+  }
+
+
+  /*
+   *  check & log
+   */
+
+  if (Run)
+  {
+    Flag = True;             /* signal success */
+
+    /* log statistics */
+    Help = GetFilename(Filepath);
+    if (Help) Log(L_INFO, "Processed %ld files for index \"%s\".", Env->Files, Help);
+    Env->Files = 0;          /* reset counter */
+  }
+
+
+  /*
+   *  clean up
+   */
+
+  /* unlock and close files */
+  if (OffsetLock) UnlockFile(OffsetFile);
+  if (AliasLock) UnlockFile(AliasFile);
+  if (LookupLock) UnlockFile(LookupFile);
+  if (DataLock) UnlockFile(DataFile);
+  if (OffsetFile) fclose(OffsetFile);
+  if (AliasFile) fclose(AliasFile);
+  if (LookupFile) fclose(LookupFile);
+  if (DataFile) fclose(DataFile);
+
+  /* free file index lists */
+  FreeDataList(Env->DataList);            /* free index data list */
+  Env->DataList = NULL;
+  Env->LastData = NULL;
+  FreeLookupList(Env->LookupList);        /* free index lookup list */
+  Env->LookupList = NULL;
+  Env->LastLookup = NULL;
+  FreeAliasList(Env->AliasList);          /* free index alias list */
+  Env->AliasList = NULL;
+  Env->LastAlias = NULL;
+
+  return Flag;
+}
+
+
+
+/* ************************************************************************
+ *   commands
+ * ************************************************************************ */
+
+
+/*
  *  include file
  *  Syntax: Include [Config <filepath>]
  *
@@ -849,29 +1189,10 @@ _Bool Cmd_Index(Token_Type *TokenList)
   _Bool             Run = True;              /* control flag */
   unsigned short    Get = 0;                 /* mode control */
   Token_Type        *FilepathToken = NULL;   /* filepath token */
-  IndexData_Type    *IndexData = NULL;       /* data list */
-  IndexData_Type    *LastData;               /* last element in data list */
-  IndexLookup_Type  *IndexLookup = NULL;     /* lookup list */
-  IndexAlias_Type   *IndexAlias = NULL;      /* alias list */
-  FILE              *DataFile = NULL;        /* index data file */
-  FILE              *LookupFile = NULL;      /* index lookup file */
-  FILE              *AliasFile = NULL;       /* index alias file */
-  FILE              *OffsetFile = NULL;      /* index offset file */
-  _Bool             DataLock = False;        /* data file locked */
-  _Bool             LookupLock = False;      /* lookup file locked */
-  _Bool             AliasLock = False;       /* alias file locked */
-  _Bool             OffsetLock = False;      /* offset file locked */
-  char              FirstChar = 0;           /* first char of filename */
-  unsigned int      Counter = 0;             /* filename/line counter */
-  off_t             Offset;                  /* file offset */
-  char              *Help;
-  _Bool             OffsetFlag = False;      /* flag for binary search mode */
 
   /* sanity check */
   if (TokenList == NULL) return Flag;
 
-  /* update flag for binary search mode */
-  if (Env->CfgSwitches & SW_BINARY_SEARCH) OffsetFlag = True;
 
   /*
    *  parse tokens
@@ -879,7 +1200,7 @@ _Bool Cmd_Index(Token_Type *TokenList)
 
   while (Run && TokenList && TokenList->String)
   {
-    if (Get == 1)    /* get value: filepath */
+    if (Get == 1)        /* get value: filepath */
     {
       FilepathToken = TokenList;
       Get = 0;                     /* reset */
@@ -888,7 +1209,7 @@ _Bool Cmd_Index(Token_Type *TokenList)
     {
       Get = 1;
     }
-    else                                               /* unknown */
+    else                 /* unknown */
     {
       Run = False;
     }
@@ -909,274 +1230,13 @@ _Bool Cmd_Index(Token_Type *TokenList)
 
 
   /*
-   * sort data
+   *  write index
    */
 
   if (Run)
   {
-    Run = False;                               /* reset flag */
-    LastData = NULL;                           /* reset pointer */
-
-    IndexData = MergeSort(Env->DataList, &LastData);   /* sort */
-    Env->DataList = IndexData;                 /* update list start */
-    Env->LastData = LastData;                  /* update list end */
-
-    if (IndexData != NULL) Run = True;         /* ok for next part */
+    Flag = WriteIndex(FilepathToken->String);
   }
-
-
-  /*
-   *  open index files
-   */
-
-  if (Run)
-  {
-    Run = False;                                /* reset flag */
-
-    /* data file */
-    snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
-      "%s."SUFFIX_DATA, FilepathToken->String);
-    DataFile = fopen(TempBuffer, "w");       /* truncate & write mode */
-
-    /* lookup file */
-    snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
-      "%s."SUFFIX_LOOKUP, FilepathToken->String);
-    LookupFile = fopen(TempBuffer, "w");     /* truncate & write mode */
-
-    /* alias file */
-    snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
-      "%s."SUFFIX_ALIAS, FilepathToken->String);
-    AliasFile = fopen(TempBuffer, "w");      /* truncate & write mode */
-
-    /* offset file */
-    snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
-      "%s."SUFFIX_OFFSET, FilepathToken->String);
-    OffsetFile = fopen(TempBuffer, "w");     /* truncate & write mode */
-
-    /* check */
-    if (DataFile && LookupFile && AliasFile && OffsetFile)
-    {
-      Run = True;                  /* ok for next part */
-    }
-    else
-    {
-      Log(L_WARN, "Can't open index files (%s)!", FilepathToken->String);
-    }
-  }
-
-
-  /*
-   *  lock index files
-   */
-
-  if (Run)
-  {
-    Run = False;                             /* reset flag */
-
-    /* lock files */
-    DataLock = LockFile(DataFile, NULL);
-    LookupLock = LockFile(LookupFile, NULL);
-    AliasLock = LockFile(AliasFile, NULL);
-    OffsetLock = LockFile(OffsetFile, NULL);
-
-    /* check */
-    if (DataLock && LookupLock && AliasLock && OffsetLock)
-    {
-      Run = True;                  /* ok for next part */
-    }
-    else
-    {
-      Log(L_WARN, "Can't lock index files (%s)!", FilepathToken->String);
-    }
-  }
-
-
-  /*
-   *  write data file and optional offset file
-   *  also build lookup list
-   *
-   *  format: <name>0x1F<filepath>[0x1F<password>]LF
-   *  We use the ascii unit separator 31 (octal 037) as field separator.
-   *  <filepath>: %<offset>%|<path>/<filename>
-   *  %<offset>% for automatic path aliasing
-   *  <filename> can be omitted if same as <name>
-   */
-
-  if (Run)
-  {
-    while (IndexData)                   /* follow list */
-    {
-      Counter++;              /* another file */
-
-      /* catch change of first letter */
-      if (IndexData->Name[0] != FirstChar)
-      {
-        /* update last line counter for old character */
-        IndexLookup = Env->LastLookup;     /* get current pointer */
-        if (IndexLookup) IndexLookup->Stop = Counter - 1;
-
-        FirstChar = IndexData->Name[0];    /* save new character */
-
-        /* add lookup element for new character */
-        Offset = ftell(DataFile);     /* get current offset of the data file */
-        AddLookupElement(FirstChar, Offset, Counter, 0);
-      }
-
-      /*
-       *  write offset file
-       *  format: <binary offset>
-       */
-
-      if (OffsetFlag)
-      {
-        Offset = ftell(DataFile);  /* get current offset of the data file */
-
-        /* write offset of the data file to the offset file */
-        if (fwrite(&Offset, sizeof(off_t), 1, OffsetFile) != 1)
-        {
-          Run = False;               /* signal problem */
-          IndexData = NULL;          /* end loop */
-          Log(L_WARN, "Write error for index offset file (%s)!", FilepathToken->String);
-        }
-      }
-
-      /* build data buffer */
-      if (IndexData->PW)           /* password required */
-      {
-        snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
-          "%s\037%s\037%s\n", IndexData->Name, IndexData->Filepath, IndexData->PW);
-      }
-      else                         /* no password */
-      {
-        snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
-          "%s\037%s\n", IndexData->Name, IndexData->Filepath);
-      }
-
-      IndexData = IndexData->Next;      /* go to next element */
-
-      /* and write to file */
-      if (fputs(OutBuffer, DataFile) < 0)    /* got an error */
-      {
-        Run = False;               /* signal problem */
-        IndexData = NULL;          /* end loop */
-        Log(L_WARN, "Write error for index data file (%s)!", FilepathToken->String);
-      }
-
-      /* check for counter overflow */
-      if (Counter >= 1000000)      /* keep it reasonable, not UINT_MAX */
-      {
-        Run = False;               /* signal problem */
-        IndexData = NULL;          /* end loop */
-        Log(L_WARN, "Fileindex overrun (%s)!", FilepathToken->String);
-      } 
-    }
-
-    /* update stop line# of last char */
-    if (Run)
-    {
-      IndexLookup = Env->LastLookup;     /* get current pointer */
-      if (IndexLookup) IndexLookup->Stop = Counter;
-    } 
-  }
-
-
-  /*
-   *  write lookup file
-   *
-   *  format: <char> <file offset> <start line#> <stop line#>LF
-   */
-
-  if (Run)
-  {
-    IndexLookup = Env->LookupList;
-
-    while (IndexLookup)            /* follow list */
-    {
-      /* build data buffer */
-      snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
-        "%c %ld %u %u\n", IndexLookup->Letter, IndexLookup->Offset,
-        IndexLookup->Start, IndexLookup->Stop);
-      
-      IndexLookup = IndexLookup->Next;     /* go to next element */
-
-      if (fputs(OutBuffer, LookupFile) < 0)    /* got an error */
-      {
-        Run = False;
-        IndexLookup = NULL;
-        Log(L_WARN, "Write error for index lookup file (%s)!", FilepathToken->String);
-      }
-    }
-  }
-
-
-  /*
-   *  write alias file
-   *
-   *  format: <path>LF
-   *  To access the paths later on the offsets to the paths are stored as aliases
-   *  in the data file.
-   */
-
-  if (Run)
-  {
-    IndexAlias = Env->AliasList;
-
-    while (IndexAlias)             /* follow list */
-    {
-      /* build data buffer */
-      snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1, "%s\n", IndexAlias->Path);
-      
-      IndexAlias = IndexAlias->Next;         /* go to next element */
-
-      if (fputs(OutBuffer, AliasFile) < 0)   /* got an error */
-      {
-        Run = False;
-        IndexAlias = NULL;
-        Log(L_WARN, "Write error for index alias file (%s)!", FilepathToken->String);
-      }
-    }
-  }
-
-
-  /*
-   *  check & log
-   */
-
-  if (Run)
-  {
-    Flag = True;             /* signal success */
-
-    /* log statistics */
-    Help = GetFilename(FilepathToken->String);
-    if (Help) Log(L_INFO, "Processed %ld files for index \"%s\".", Env->Files, Help);
-    Env->Files = 0;          /* reset counter */
-  }
-
-
-  /*
-   *  clean up
-   */
-
-  /* unlock and close files */
-  if (OffsetLock) UnlockFile(OffsetFile);
-  if (AliasLock) UnlockFile(AliasFile);
-  if (LookupLock) UnlockFile(LookupFile);
-  if (DataLock) UnlockFile(DataFile);
-  if (OffsetFile) fclose(OffsetFile);
-  if (AliasFile) fclose(AliasFile);
-  if (LookupFile) fclose(LookupFile);
-  if (DataFile) fclose(DataFile);
-
-  /* free file index lists */
-  FreeDataList(Env->DataList);            /* free index data list */
-  Env->DataList = NULL;
-  Env->LastData = NULL;
-  FreeLookupList(Env->LookupList);        /* free index lookup list */
-  Env->LookupList = NULL;
-  Env->LastLookup = NULL;
-  FreeAliasList(Env->AliasList);          /* free index alias list */
-  Env->AliasList = NULL;
-  Env->LastAlias = NULL;
 
   return Flag;
 }
@@ -1917,8 +1977,8 @@ _Bool Cmd_SetMode(Token_Type *TokenList)
   _Bool                  Flag = False;       /* return value */
   _Bool                  Run = True;         /* control flag */
   unsigned short         Keyword = 0;        /* keyword ID */
-  static char            *Keywords[4] =
-    {"SetMode", "PathAliases", "BinarySearch", NULL};
+  static char            *Keywords[5] =
+    {"SetMode", "PathAliases", "BinarySearch", "AnyCase", NULL};
 
   /* sanity check */
   if (TokenList == NULL) return Flag;
@@ -1948,6 +2008,10 @@ _Bool Cmd_SetMode(Token_Type *TokenList)
 
       case 3:       /* binary search */
         Env->CfgSwitches |= SW_BINARY_SEARCH;
+        break;
+
+      case 4:       /* case-insensitive search */
+        Env->CfgSwitches |= SW_ANY_CASE;
         break;
     }
 

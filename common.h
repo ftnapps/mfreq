@@ -36,9 +36,9 @@
 
 /* about */
 #define PROJECT          "mfreq"
-#define VERSION          "v3.15"
+#define VERSION          "v3.16"
 #define VERSION_MAJOR    3
-#define VERSION_MINOR    15
+#define VERSION_MINOR    16
 #define COPYRIGHT        "(c) 1994-2017 by Markus Reschke"
 
 /* default paths */
@@ -104,20 +104,30 @@
 #define REQ_LISTED            0b0000000000000100  /* listed system */
 #define REQ_UNLISTED          0b0000000000001000  /* unlisted system */
 
-/* file status (bitmask, 16 bits) */
-/* common */
-#define STAT_NONE             0b0000000000000000  /* no status */
-#define STAT_OK               0b0000000000000001  /* ok (to send/list) */
-/* list */
-#define STAT_NOT_FOUND        0b0000000000000010  /* file deleted / not found */
-#define STAT_EXCLUDED         0b0000000000000100  /* file excluded */
-#define STAT_CHANGED          0b0000000000001000  /* some value changed */
-/* send */
-#define STAT_FILELIMIT        0b0000000000010000  /* file limit exceeded */
-#define STAT_BYTELIMIT        0b0000000000100000  /* byte limit exceeded */
-#define STAT_PWERROR          0b0000000001000000  /* password error */
-#define STAT_OFFLINE          0b0000000010000000  /* not available right now */
-#define STAT_DUPE             0b0000000100000000  /* duplicate file */
+/* file info status (bitmask, 16 bits) */
+#define FINFO_NONE            0b0000000000000000  /* no status */
+#define FINFO_OK              0b0000000000000001  /* ok to list */
+#define FINFO_NOT_FOUND       0b0000000000000010  /* file deleted / not found */
+#define FINFO_EXCLUDED        0b0000000000000100  /* file excluded */
+#define FINFO_CHANGED         0b0000000000001000  /* some value changed */
+
+/* file response status (bitmask, 16 bits) */
+#define RESP_NONE             0b0000000000000000  /* no status */
+#define RESP_OK               0b0000000000000001  /* ok to send */
+#define RESP_PWERROR          0b0000000000000010  /* password error */
+#define RESP_OFFLINE          0b0000000000000100  /* not available right now */
+#define RESP_DUPE             0b0000000000001000  /* duplicate file */
+#define RESP_INTDUPE          0b0000000000010000  /* internal dupe */
+
+/* file request status (bitmask, 16 bits) */
+#define FREQ_NONE             0b0000000000000000  /* no status */
+#define FREQ_NO_FILE          0b0000000000000001  /* no file found */
+#define FREQ_FOUND_FILE       0b0000000000000010  /* found file(s) */
+#define FREQ_LIMIT            0b0000000000010000  /* any limits exceeded */
+#define FREQ_FILELIMIT        0b0000000000100000  /* file limit exceeded */
+#define FREQ_BYTELIMIT        0b0000000001000000  /* byte limit exceeded */
+#define FREQ_PWLIMIT          0b0000000010000000  /* bad PW limit exceeded */
+#define FREQ_FREQLIMIT        0b0000000100000000  /* frequests (filename patterns) */
 
 /* file info modes (bitmask, 16 bits) */
 #define INFO_NONE             0b0000000000000000  /* no mode */
@@ -253,7 +263,9 @@ typedef struct limit
 {
   char              *Address;           /* FTS address pattern */
   long              Files;              /* number of files */
-  long long         Bytes;              /* number of bytes (twice as long as off_t) */
+  long long         Bytes;              /* sum of bytes (twice as long as off_t) */
+  int               BadPWs;             /* number of bad passwords */
+  int               Freqs;              /* number of frequests (file patterns) */ 
   unsigned short    Flags;              /* additional flags/conditions */
   struct limit      *Next;              /* pointer to next element */
 } Limit_Type;
@@ -274,6 +286,7 @@ typedef struct request
 {
   char              *Name;              /* file name or pattern */
   char              *PW;                /* password */
+  unsigned short    Status;             /* request status */
   Response_Type     *Files;             /* files to send (linked list) */
   Response_Type     *LastFile;          /* pointer to last element in list */
   struct request    *Next;              /* pointer to next element */

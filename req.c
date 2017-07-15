@@ -145,7 +145,8 @@ void FreeLimitList(Limit_Type *List)
  *  - 0 on error
  */
 
-_Bool AddLimitElement(char *Address, long Files, long long Bytes, unsigned int Flags)
+_Bool AddLimitElement(char *Address, long Files, long long Bytes, int BadPWs,
+  int Freqs, unsigned int Flags)
 {
   _Bool               Flag = False;        /* return value */
   Limit_Type          *Element;            /* new element */
@@ -164,6 +165,8 @@ _Bool AddLimitElement(char *Address, long Files, long long Bytes, unsigned int F
     Element->Address = CopyString(Address);
     Element->Files = Files;
     Element->Bytes = Bytes;
+    Element->BadPWs = BadPWs;
+    Element->Freqs = Freqs;
     Element->Flags = Flags;
 
     /* add new element to list */
@@ -236,7 +239,7 @@ Response_Type *CreateResponseElement(char *Filepath)
   {
     /* set defaults */
     Element->Size = -1;
-    Element->Status = STAT_NONE;
+    Element->Status = RESP_NONE;
     Element->Next = NULL;
 
     /* copy data */
@@ -253,53 +256,85 @@ Response_Type *CreateResponseElement(char *Filepath)
 
 
 /*
- *  check all files found yet for a duplicate file
+ *  check for duplicate in list of files already found
+ *  - for a specific request
  *
  *  requires:
- *  - response element to check
+ *  - request element to search
+ *  - response element to check for
  *
  *  returns:
  *  - 0 if no duplicate is found
  *  - 1 if a duplicate is found
  */
 
-_Bool DuplicateResponse(Response_Type *Response)
+_Bool DuplicateResponse(Request_Type *Request, Response_Type *Response)
+{
+  _Bool                  Flag = False;       /* return value */
+  Response_Type          *File;
+
+  /* sanity check */
+  if ((Request == NULL) || (Response == NULL)) return Flag;
+
+  File = Request->Files;           /* first element */
+
+  while (File && !Flag)            /* loop through list */
+  {
+    if (File != Response)          /* not me */
+    {
+      /* check if both got the same filepath */
+      if (File->Filepath && Response->Filepath)   /* sanity check */
+      {
+        if (strcmp(File->Filepath, Response->Filepath) == 0)
+        {
+          Flag = True;             /* signal duplicate */
+        }
+      }
+    }
+
+    File = File->Next;             /* next file */
+  }
+
+  return Flag;
+}
+
+
+
+/*
+ *  check for duplicate in list of files already found
+ *  - for all requested files
+ *
+ *  requires:
+ *  - response element to check for
+ *
+ *  returns:
+ *  - 0 if no duplicate is found
+ *  - 1 if a duplicate is found
+ */
+
+_Bool AnyDuplicateResponse(Response_Type *Response)
 {
   _Bool                  Flag = False;       /* return value */
   Request_Type           *Request = NULL;
-  Response_Type          *File;
 
   /* sanity check */
   if (Response == NULL) return Flag;
 
-  if (Env) Request = Env->RequestList;       /* get starting point */
+  if (Env)
+  {
+    Request = Env->RequestList;         /* first request element */
+  }
 
 
   /*
-   *  loop through all requested files and the files found
-   *  and check for duplicate filepath
+   *  loop through all requested files
+   *  and check for any duplicate filepath
    */
 
   while (Request && !Flag)    /* loop through requests */
   {
-    File = Request->Files;         /* first file found */
-
-    while (File && !Flag)     /* loop through files found */
-    {
-      if (File != Response)        /* skip me */
-      {
-        /* check if both got the same filepath */
-        if (File->Filepath && Response->Filepath)
-        {
-          if (strcmp(File->Filepath, Response->Filepath) == 0)
-          {
-            Flag = True;           /* signal dupe */
-          }
-        }
-      }
-
-      File = File->Next;                /* next file */
-    }
+    /* check current request for duplicates */
+    Flag = DuplicateResponse(Request, Response);
 
     Request = Request->Next;            /* next request */
   }
@@ -366,6 +401,7 @@ _Bool AddRequestElement(char *Name, char *Password)
     /* set defaults */
     Element->PW = NULL;
     Element->Files = NULL;
+    Element->Status = FREQ_NONE;
     Element->LastFile = NULL;
     Element->Next = NULL;
 

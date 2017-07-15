@@ -14,7 +14,8 @@ VERSION = $(subst ${NAME}-,,${DIST})
 
 # compiler flags
 CC = gcc
-CFLAGS = -fstack-protector -Wall -g -I/usr/include -I. ${DEFINES}
+CFLAGS = -fstack-protector -fstack-check -Wall -g -I/usr/include -I. ${DEFINES}
+#CFLAGS += -D_FILE_OFFSET_BITS 64
 LDFLAGS =
 
 # libraries to link
@@ -78,7 +79,8 @@ dist: ${PROGS}
           ${DIST}/*.h ${DIST}/*.c ${DIST}/Makefile \
           ${DIST}/README ${DIST}/CHANGES ${DIST}/*.pdf \
           ${DIST}/sample-cfg ${DIST}/mfreq.spec \
-	  ${DIST}/mfreq-index ${DIST}/mfreq-srif ${DIST}/mfreq-list
+	  ${DIST}/mfreq-index ${DIST}/mfreq-srif ${DIST}/mfreq-list \
+	  ${DIST}/frequest ${DIST}/sendfile
 
 
 #

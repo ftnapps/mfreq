@@ -3,11 +3,11 @@
 
                             ReadMe for mfreq suite
 
-                       (c) 1994-2016 by Markus Reschke
+                       (c) 1994-2017 by Markus Reschke
 
 ------------------------------------------------------------------------------
 
-Last edit: 2017-05-26
+Last edit: 2017-07-13
 
 
 * About
@@ -143,7 +143,8 @@ With SetMode you enable following features:
   Switch         Feature
   ----------------------------------------------
   PathAliases    create path aliases
-  BinarySearch   enable binary filename search
+  AnyCase        create index for case-insensitive search 
+  BinarySearch   create offset file for binary filename search
 
 With PathAliases enabled mfreq-index creates automatically aliases for paths
 in the index data file and writes those aliases into the index alias file.
@@ -151,11 +152,17 @@ That way the size of the index data file is decreased hugely. The drawback
 is that the request processing might take a little bit longer. This feature
 is supported just for regular files, not magics. 
 
+The AnyCase switch causes the index to be sorted differently for supporting
+case-insensitive filename search by the frequest processor.
+
 If you got a large filebase with tons of files you should enable the binary
 search feature to speed up filename searching for simple requests (no wildcard
 as first character). Enable this feature for the request processor too. The
-speed gain is achieved by creating an additional index file and using the
-well known binary search algorithm.
+speed gain is achieved by creating an additional index file (offset) and using
+the well known binary search algorithm.
+
+Hint: When you enable AnyCase and/or BinarySearch please do the same for
+      mfreq-srif and vice versa.
 
 
 + Reset Command
@@ -290,10 +297,14 @@ to the specified filepath. Following files will be written (based on SetMode):
   - <filepath>.alias
   - <filepath>.offset
 
-After writing the index the internal file index is emptied. Any new files are
-collected in the file index again, until another Index command will write
-those files to a new index and so on. This might come in handy if you got
-memory contraints or you need different file indexes for whatever reason.
+After writing the index the internal file index buffer is emptied. Any new
+files are added to file index buffer again, until another Index command will
+write those files to a new index and so on. This might come in handy if you
+got memory contraints or if you need different file indexes for whatever
+reason.
+
+Hint: The number of files per index are limited to 1000000. If you got more
+files, please create multiple indexes.
 
 
 * ToDo / Feature Requests
@@ -718,6 +729,7 @@ Some stuff which needs to be fixed or would be nice to have:
   - Support file_id.diz? Try to extract?
   - Ignore a missing directory and keep processing?
   - Verbose logging (including cfg switch)?
+  - Support recursion for directories ("Depth" option)? 
 
 
 
@@ -795,12 +807,15 @@ The frequest handler creates a response netmail or textmail for the requestor
 and adds the netmail packet or textmail file to the response list (with the
 delete-me-after-sent indicator).
 
-A result textblock is generated for each requested file/pattern:
+A "result" textblock is generated for each requested file/pattern:
 
   <empty line>
   <file/pattern requested>
      - <file found or other feedback>
     [- <file found or other feedback>]
+
+The "totals" textblock lists the number of files found and their byte sum.
+It also gives hints about exeeded file, byte or frequest limits.  
 
 The message is formatted like this:
 
@@ -809,11 +824,11 @@ The message is formatted like this:
   [Result]
   ...
   [Result]
+  <Totals>
   [MailFooter]
 
-Password errors are treated like "no files found". By omitting any
-information about password problems the requestor is discouraged from
-password guessing.
+Password errors are reported as "nothing found". By omitting any hint about
+password problems the requestor will be discouraged from guessing passwords.
 
 
 * Configuration
@@ -879,9 +894,12 @@ setting is automatically changed into textmail.
 Please set the RemoveReq switch if your mailer doesn't delete the request file
 after calling the frequest handler.
 
-If you've enabled the binary search feature for mfreq-index, enable it here
-too. This feature uses an additional index file to perform a binary search to
-speed up the processing of file requests.
+The AnyCase switch enables case-insensitive filename matching and requires a
+specifically sorted index, i.e. AnyCase has be enbled for mfreq-index too.
+
+If you set BinarySearch the program uses a binary search algorithm to speed
+up the processing of file requests. Also enable BinarySearch for mfreq-index
+to create an additional index file (offset) which is needed for this feature.
 
 With LogRequest set mfreq-srif logs which files are requested and which are  
 going to be sent.
@@ -890,6 +908,9 @@ The SI-Units switch enables metric unit prefixes for any input and output, i.e.
 1 kB = 1000 Bytes. By default the binary prefix system is used. The IEC-Units
 switch enables output of the IEC prefix recommendations (1024 Bytes = 1 KiB)
 and overrides the SI-Units switch for output.
+
+Hint: When you enable AnyCase and/or BinarySearch please do the same for
+      mfreq-index and vice versa.
 
 
 + Address Setting
@@ -941,8 +962,8 @@ To circumvent that just add a space, like:
 + Limit Setting
 
 Syntax:
-  Limit <FTS address pattern> [Files <files>] [Bytes <bytes>]
-        [IfListed]
+  Limit <FTS address pattern> [Files <number>] [Bytes <bytes>]
+        [BadPWs <number>] [Freqs <number>] [IfListed]
 
 This settings limits what a requester may retrieve. Actually it's a list of
 rules linked to a specfic FTS address pattern. The first matching rule will be
@@ -970,7 +991,10 @@ The Files argument limits the number of files which may be requested. And
 the Bytes argument defines the maximum number of bytes allowed. Both values
 should be in the range of 0 to 2147483000 (2^31 - 1). Zero means "none", i.e.
 that node won't get anything. There is also the special value "-1" for a
-unlimited number of files or bytes.
+unlimited number of files or bytes. The BadPWs argument defines how many
+bad passwords are tolerated, while Freqs sets the maximum number of filename
+patterns allowed in a frequest (number scheme as above). The program will use
+a default value for any omitted limit type (see below for defaults)
 
 For the byte value you may use following units:
   - kB for kilobytes (binary in default mode, decimal if SI units are enabled)
@@ -1001,11 +1025,13 @@ in a nodelist. That information is provided by the mailer via the SRIF file.
 
 If you define any rules, it's strongly recommended to define also a rule of
 last resort, like
-  Limit * Files 10 Bytes 2MB
+  Limit * Files 10 Bytes 2MB BadPWs 1 Freqs 10
 
 The following defaults are used if no limit is given at all:
   - 20 files
   - 2000000 bytes
+  - 2 bad passwords
+  - 10 frequests (filename pattern)
 
 
 + Index Setting
@@ -1044,6 +1070,31 @@ Some stuff which needs to be fixed or would be nice to have:
 
 Format of entries in the log file:
 <MMM> <DD> <HH>:<MM>:<SS> <YYYY> [<PID>] <message>
+
+
+* Goodies
+
+Some extra stuff included:
+
+
++ frequest
+
+A simple bash script to request files. It creates a .req file and a control
+file for BSO mailers. Please update the variables OUTBOUND and MY_ZONE to
+match your system.
+
+Command syntax: 
+  frequest <FTS address> <filename> [more filenames]
+
+
++ sendfile
+
+This bash script will send files. It creates/updates the .flo control file
+for BSO mailers. Again, update the variables OUTBOUND and MY_ZONE to match
+your system.
+
+Command syntax:
+  sendfile <FTS address> <filename> [more filenames]
 
 
 * Latest Version

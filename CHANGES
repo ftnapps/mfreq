@@ -6,6 +6,29 @@
 
 ------------------------------------------------------------------------------
 
+* 2017-07 / Version 3.16
+
+all:
+  - Added two shell scripts for creating file requests and sending files.
+
+mfreq-index
+  - Minor improvements.
+  - Added "AnyCase" switch to SetMode command to create file index
+    specifically sorted for case-insensitive search.
+
+mfreq-srif
+  - Several minor improvements.
+  - Fixed memory management error in UnTokenize() (reported by Ingo
+    Jürgensmann 2:2452/413).
+  - The fix in BinaryPreSearch() introduced a new bug (reported by Ingo
+    Jürgensmann 2:2452/413). Removed former fix and modified algorithm to
+    converge more stable.
+  - Fixed bug in case-insensitive search (reported by Ingo Jürgensmann
+    2:2452/413).
+  - Added limits for bad passwords (option "BadPWs" for Limit setting) and
+    frequests (option "Freqs").
+
+
 * 2017-05 / Version 3.15
 
 all:
@@ -23,8 +46,8 @@ mfreq-srif:
 * 2015-10 / Version 3.14
 
 mfreq-list:
-  - Bug fix: when scanning an empty file area mfreq-list stopped processing. 
-    (reported by Eric Renfro 1:135/371)
+  - Bug fix: when scanning an empty file area mfreq-list stopped processing
+    (reported by Eric Renfro 1:135/371).
 
 all:
   - Compatibility check for 64 bit systems.

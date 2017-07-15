@@ -322,7 +322,7 @@ char *UnTokenize(Token_Type *List)
   char              *String = NULL;     /* return value */
   char              *Buffer;
   Token_Type        *Token;
-  size_t            Size;
+  size_t            Size = 0;
   int               Counter;
 
   /* sanity checks */

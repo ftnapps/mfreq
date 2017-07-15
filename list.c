@@ -83,7 +83,7 @@ _Bool AddInfoElement(char *Name, off_t Size, time_t Time)
   {
     /* set defaults */
     Element->Counter = 0;
-    Element->Status = STAT_NONE;
+    Element->Status = FINFO_NONE;
     Element->Infos = NULL;
     Element->LastInfo = NULL;
     Element->Next = NULL;

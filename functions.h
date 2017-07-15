@@ -2,7 +2,7 @@
  *
  *   functions header file
  *
- *   (c) 1994-2015 by Markus Reschke
+ *   (c) 1994-2017 by Markus Reschke
  *
  * ************************************************************************ */
 
@@ -111,11 +111,12 @@
 
   extern void FreeLimitList(Limit_Type *List);
   extern _Bool AddLimitElement(char *Address, long Files, long long Bytes,
-    unsigned int Flags);
+    int BadPWs, int Freqs, unsigned int Flags);
 
   extern void FreeResponseList(Response_Type *List);
   extern Response_Type *CreateResponseElement(char *Filepath);
-  extern _Bool DuplicateResponse(Response_Type *Response);
+  extern _Bool DuplicateResponse(Request_Type *Request, Response_Type *Response);
+  extern _Bool AnyDuplicateResponse(Response_Type *Response);
 
   extern void FreeRequestList(Request_Type *List);
   extern _Bool AddRequestElement(char *Name, char *Password);

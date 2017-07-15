@@ -2,7 +2,7 @@
  *
  *   FTS stuff
  *
- *   (c) 1994-2015 by Markus Reschke
+ *   (c) 1994-2017 by Markus Reschke
  *
  * ************************************************************************ */
 
@@ -805,12 +805,10 @@ _Bool WriteNetmailKludges(FILE *File)
 _Bool WriteMailContent(FILE *File)
 {
   _Bool                  Flag = False;        /* return value */
-  Token_Type             *Token;
+  Token_Type             *Token;              /* token list */
   Request_Type           *Request;            /* requested file */
   Response_Type          *Response;           /* file found */
   char                   *Help;
-  unsigned int           FileCounter;
-  unsigned int           ErrorCounter;
 
   /* sanity check */
   if (File == NULL) return Flag;
@@ -849,84 +847,79 @@ _Bool WriteMailContent(FILE *File)
    *  results
    */
 
-  Request = Env->RequestList;
+  Request = Env->RequestList;      /* first request */
 
-  if (Request == NULL)             /* no request */
+  if (Request == NULL)             /* no requests */
   {
     snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
       "\r\nNothing requested!\r\n");
     fputs(OutBuffer, File);
   }
 
-  while (Request)                  /* follow list */
+  while (Request)             /* follow request list */
   {
-    /* what's requested? */
+    /* requested filename pattern */
     snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
       "\r\nRequested \"%s\":\r\n", Request->Name);
     fputs(OutBuffer, File);
 
-    FileCounter = 0;               /* reset counter */
-    ErrorCounter = 0;
-    Response = Request->Files;     /* list of files found */
+    /* no files found */
+    if (Request->Status & FREQ_NO_FILE)
+    {
+      snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
+        "  - nothing found\r\n");
+      fputs(OutBuffer, File);
+    }
 
-    while (Response)          /* follow file list */
+    /* ignored */
+    else if (Request->Status == FREQ_NONE)
+    {
+      snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
+        "  - ignored\r\n");
+      fputs(OutBuffer, File);
+    }
+
+
+    /*
+     *  list files found
+     */
+
+    Response = Request->Files;          /* first file found */
+
+    while (Response)               /* follow file list */
     {
       OutBuffer[0] = 0;            /* reset buffer */
       Help = GetFilename(Response->Filepath);     /* get filename */
 
-      if (Help)          /* sanity check */
+      if (Help)               /* sanity check */
       {
-        FileCounter++;        /* got another file */
-
         /* file is ok */
-        if (Response->Status & STAT_OK)
+        if (Response->Status & RESP_OK)
         {
           if (Bytes2String(Response->Size, TempBuffer, DEFAULT_BUFFER_SIZE - 1))
+          {
             snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
               "  - %s (%s)\r\n", Help, TempBuffer);
+          }
           else
+          {
             snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
               "  - %s (%ld Bytes)\r\n", Help, Response->Size);
-        }
-
-        /* password error */
-        else if (Response->Status & STAT_PWERROR)
-        {
-          ErrorCounter++;        /* got a password error */
-        }
-
-        /* file limit exceeded */
-        else if (Response->Status & STAT_FILELIMIT)
-        {
-          snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
-            "  - next file would exceed file limit\r\n");
-        }
-
-        /* byte limit exceeded */
-        else if (Response->Status & STAT_BYTELIMIT)
-        {
-          snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
-            "  - next file would exceed byte limit\r\n");
+          }
         }
 
         /* duplicate file */
-        else if (Response->Status & STAT_DUPE)
+        else if (Response->Status & RESP_DUPE)
         {
           snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
             "  - %s (duplicate file)\r\n", Help);
         }
 
         /* file currently offline */
-        else if (Response->Status & STAT_OFFLINE)
+        else if (Response->Status & RESP_OFFLINE)
         {
           snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
             "  - %s (currently not available)\r\n", Help);
-        }
-
-        /* unknown file status */
-        else
-        {
-          ErrorCounter++;        /* got an error */
         }
 
         /* write buffer if changed */
@@ -934,14 +927,6 @@ _Bool WriteMailContent(FILE *File)
       }
 
       Response = Response->Next;        /* next file */ 
-    }
-
-    /* no files or only errors */
-    if (FileCounter == ErrorCounter)
-    {
-      snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
-        "  - nothing found\r\n");
-      fputs(OutBuffer, File);
     }
 
     Request = Request->Next;       /* next request */
@@ -955,16 +940,46 @@ _Bool WriteMailContent(FILE *File)
   snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
     "\r\nTotals:\r\n");
   fputs(OutBuffer, File);
+
+  /* files */
   snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
     "  - %ld files\r\n", Env->Files);
   fputs(OutBuffer, File);
+
+  /* bytes */
   if (Bytes2String(Env->Bytes, TempBuffer, DEFAULT_BUFFER_SIZE - 1))
+  {
     snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
       "  - %s\r\n", TempBuffer);
+  }
   else
+  {
     snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
       "  - %lld Bytes\r\n", Env->Bytes); 
+  }
   fputs(OutBuffer, File);
+
+  /*  file limit */
+  if (Env->FreqStatus & FREQ_FILELIMIT)
+  {
+    snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
+      "  - file limit exceeded\r\n");
+    fputs(OutBuffer, File);
+  }
+
+  if (Env->FreqStatus & FREQ_BYTELIMIT)
+  {
+    snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
+      "  - byte limit exceeded\r\n");
+    fputs(OutBuffer, File);
+  }
+
+  if (Env->FreqStatus & FREQ_FREQLIMIT)
+  {
+    snprintf(OutBuffer, DEFAULT_BUFFER_SIZE - 1,
+      "  - frequest limit exceeded\r\n");
+    fputs(OutBuffer, File);
+  }
 
 
   /*

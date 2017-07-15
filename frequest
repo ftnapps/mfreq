@@ -1,0 +1,127 @@
+#!/bin/bash
+
+#
+# frequest v1.03
+# (c) 2012-2017 by Markus Reschke
+# Create or update a request file for a FTS system
+#
+# Supported outbound format (binkley style):
+# - out/NNNNnnnn.req
+# - out.ZZZ/NNNNnnnn.req
+# - out/NNNNnnnn.pnt/0000PPPP.req
+# - out.ZZZ/NNNNnnnn.pnt/0000PPPP.req
+#
+# Z = zone number in hex         
+# N = net number in hex
+# n = node number in hex
+# P = point number in hex
+#
+
+# script control
+STAT=1
+trap 'exit $STAT' 0 1 2 15
+
+# global settings/variables
+OUTBOUND="/var/spool/outbound"
+MY_ZONE="2"
+
+
+#
+# main
+#
+
+# usage
+case "$*" in
+"") echo "Purpose: frequest files from a FTS system";
+    echo "Usage:   `basename $0` <FTS address> <filename> [more filenames]";
+    exit;;
+esac
+
+# check if we got all required options
+ADDRESS="$1"
+FILENAME="$2"
+
+if [ ! "$ADDRESS" ]; then
+ echo "Missing FTS address!"
+ exit
+fi
+
+if [ ! "$FILENAME" ]; then
+ echo "Missing filename!"
+ exit
+fi
+
+# check FTS address
+TEST1=`echo "$ADDRESS" | grep '^[0-9][0-9]*:[0-9][0-9]*/[0-9][0-9]*\.[0-9][0-9]*$'`
+TEST2=`echo "$ADDRESS" | grep '^[0-9][0-9]*:[0-9][0-9]*/[0-9][0-9]*$'`
+if [ -z "$TEST1" ] && [ -z "$TEST2" ]; then
+  echo "Wrong FTS address format!"
+  exit
+fi
+
+# get elements of FTS address
+FTS=`echo $ADDRESS | tr '.:/' ' '`
+ZONE=`echo "$FTS" | awk '{print $1}'`
+NET=`echo "$FTS" | awk '{print $2}'`
+NODE=`echo "$FTS" | awk '{print $3}'`
+POINT=`echo "$FTS" | awk '{print $4}'`
+
+# zone based outbound
+OUTBOUND="$OUTBOUND/out"
+
+if [ "$ZONE" != "$MY_ZONE" ]; then
+  # add zone
+  TEMP1=`printf "%03x" $ZONE`
+  OUTBOUND="$OUTBOUND.$TEMP1"
+fi
+
+# create REQ file path
+if [ "$POINT" == "" ] || [ "$POINT" == "0" ]; then
+  # node
+  REQ_FILE=`printf "%04x%04x.req" $NET $NODE`
+  REQ_DIR="$OUTBOUND"
+else
+  # point
+  REQ_FILE=`printf "0000%04x.req" $POINT`
+  REQ_DIR="$OUTBOUND"/`printf "%04x%04x.pnt" $NET $NODE`
+fi
+
+REQ_FILEPATH="$REQ_DIR"/"$REQ_FILE"
+
+# create zone based outbound if required
+if [ ! -d "$OUTBOUND" ]; then
+  mkdir "$OUTBOUND"
+fi
+
+# create REQ path if required
+if [ ! -d "$REQ_DIR" ]; then
+  mkdir "$REQ_DIR"
+fi
+
+# tell user
+if [ -r "$REQ_FILEPATH" ]; then
+  echo "Adding files for $ADDRESS:"
+else
+  echo "Creating new request file for $ADDRESS:"
+fi
+
+# add files to request file
+shift
+
+while [ "$1" ]
+do
+  echo "$1" >> "$REQ_FILEPATH"
+  echo "- $1"
+  shift
+done
+
+# trigger call
+CONTROL=`printf "%04x%04x.ilo" $NET $NODE`
+
+# create control file if there is none yet
+if [ ! -f "$REQ_DIR/$CONTROL" ]; then
+  echo "" > "$REQ_DIR/$CONTROL"
+fi
+
+# successful end
+STAT=0

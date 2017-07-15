@@ -61,8 +61,12 @@
  *  local variables
  */
 
+/* buffers */
 char                *InBuffer2 = NULL;       /* for file reading */
 char                *AliasBuffer = NULL;     /* for aliases */
+
+/* counters */
+int                 BadPWs = 0;              /* number of bad passwords */
 
 
 
@@ -157,7 +161,7 @@ char *GetAlias(FILE *AliasFile, off_t Offset)
   if ((AliasFile == NULL) || (Offset < 0)) return Path;
 
   /* move to offset position */
-  fseek(AliasFile, Offset, SEEK_SET);
+  fseeko(AliasFile, Offset, SEEK_SET);
 
   /* read path from current line */
   if (fgets(InBuffer2, DEFAULT_BUFFER_SIZE, AliasFile) != NULL)
@@ -353,7 +357,7 @@ _Bool ParseIndexLookup(Token_Type *Tokens)
 /*
  *  read lookup file
  *
- *  format: <first char> <offset>LF
+ *  format: <first char> <offset> <start line#> <stop line#>LF
  *
  *  returns:
  *  - 1 on success
@@ -527,43 +531,75 @@ void LogRequest()
   Response_Type          *Response;     /* file found */
   char                   *Help;         /* temporary string */
 
-  Request = Env->RequestList;           /* get first request */
+  Request = Env->RequestList;           /* first request */
 
   while (Request)                       /* follow requests */
   {
-    /* what's requested */
-    if (Request->PW)
-      Log(L_INFO, "Requested: %s !%s", Request->Name, Request->PW);
-    else
-      Log(L_INFO, "Requested: %s", Request->Name);
+    /* requested filename pattern */
+    if (Request->PW)                    /* with password */
+    {
+      Log(L_INFO, "FReq: %s !%s", Request->Name, Request->PW);
+    }
+    else                                /* without password */
+    {
+      Log(L_INFO, "FReq: %s", Request->Name);
+    }
 
-    Response = Request->Files;          /* get first file */
+
+    Response = Request->Files;          /* first file */
 
     while (Response)                    /* follow files */
     {
       Help = GetFilename(Response->Filepath);   /* get pointer to filename */
-      if (Help == NULL) Help = Response->Filepath;
+      if (Help == NULL)                         /* error */
+      {
+        Help = Response->Filepath;              /* use filepath instead */
+      }
 
       if (Help)       /* sanity check */
       {
         /* file is ok */
-        if (Response->Status & STAT_OK)
+        if (Response->Status & RESP_OK)
         {
           if (Bytes2String(Response->Size, TempBuffer, DEFAULT_BUFFER_SIZE - 1))
-            Log(L_INFO, "Responded: %s (%s)", Help, TempBuffer);
+            Log(L_INFO, "- %s (%s)", Help, TempBuffer);
         }
 
         /* password error */
-        else if (Response->Status & STAT_PWERROR)
+        else if (Response->Status & RESP_PWERROR)
         {
-          Log(L_INFO, "PW Error:  %s", Help);
+          Log(L_INFO, "- PW Error (%s)", Help);
+        }
+
+        /* file offline */
+        else if (Response->Status & RESP_OFFLINE)
+        {
+          Log(L_INFO, "- Offline (%s)", Help);
+        }
+
+        /* file dupe */
+        else if (Response->Status & RESP_DUPE)
+        {
+          Log(L_INFO, "- Dupe (%s)", Help);
         }
       }
 
-      Response = Response->Next;      /* next file */
+      Response = Response->Next;        /* next file */
     }
 
-    Request = Request->Next;       /* next request */
+    /* no files found */
+    if (Request->Status & FREQ_NO_FILE)
+    {
+      Log(L_INFO, "- nothing found", Help);
+    }
+
+    /* ignored */
+    else if (Request->Status == FREQ_NONE)
+    {
+      Log(L_INFO, "- ignored", Help);
+    }
+
+    Request = Request->Next;            /* next request */
   }
 }
 
@@ -695,7 +731,7 @@ _Bool WriteResponse()
       while (Run && Response)                /* follow linked list */
       {
         /* list valid files only */
-        if (Response->Filepath && (Response->Status & STAT_OK))
+        if (Response->Filepath && (Response->Status & RESP_OK))
         {
           /* write filepath to response file */
 
@@ -885,8 +921,9 @@ _Bool ActivateLimits()
   if (Env->ActiveLimit)
   {
     if (Bytes2String(Env->ActiveLimit->Bytes, TempBuffer, DEFAULT_BUFFER_SIZE))
-      Log(L_INFO, "Limits used: %ld files / %s",
-          Env->ActiveLimit->Files, TempBuffer);
+      Log(L_INFO, "Limits used: %ld files / %s / %d BadPWs / %d Freqs",
+          Env->ActiveLimit->Files, TempBuffer, Env->ActiveLimit->BadPWs,
+          Env->ActiveLimit->Freqs);
   }
 
   return Flag;
@@ -912,8 +949,8 @@ _Bool SearchIndex(FILE *DataFile, FILE *AliasFile, Request_Type *Request, int Po
   _Bool                  Flag = True;         /* return value */
   _Bool                  Run = True;          /* loop control */
   _Bool                  Match = False;       /* match flag */
-  _Bool                  AnyCase = False;     /* case insensitive search */
   size_t                 Length;              /* string length */
+  char                   *Requested;          /* requested file pattern */
   char                   *Help;               /* temporary string */
   char                   *Name, *Filepath, *Password;
   int                    Check;               /* test value */
@@ -925,8 +962,21 @@ _Bool SearchIndex(FILE *DataFile, FILE *AliasFile, Request_Type *Request, int Po
       (Request == NULL))
     return False;
 
-  /* update flag for case insensitive search */
-  if (Env->CfgSwitches & SW_ANY_CASE) AnyCase = True;
+  /* local copy of requested file pattern */
+  Requested = CopyString(Request->Name);
+  if (Requested == NULL) return False;
+
+  /* setup for case insensitive search */
+  if (Env->CfgSwitches & SW_ANY_CASE)   /* case insensitive search */
+  {
+    /* convert search pattern to upper case */
+    Help = Requested;
+    while (Help[0] != 0)
+    {
+      Help[0] = toupper(Help[0]);
+      Help++;                           /* next char */
+    }
+  }
 
   while (Run)                 /* processing loop */
   {
@@ -971,7 +1021,7 @@ _Bool SearchIndex(FILE *DataFile, FILE *AliasFile, Request_Type *Request, int Po
           Length--;
         }
 
-        /* if it's not an empty */
+        /* if it's not empty */
         if (InBuffer[0] != 0)
         {
           /*
@@ -1019,90 +1069,89 @@ _Bool SearchIndex(FILE *DataFile, FILE *AliasFile, Request_Type *Request, int Po
 
     if (Run && Name && Filepath)
     {
-      if (AnyCase)               /* case-insensitive mode */
-      {
-        /* copy original name for automatic filepath */ 
-        snprintf(AliasBuffer, DEFAULT_BUFFER_SIZE - 1, "%s", Name);
-
-        /* convert name to upper case */
-        Help = Name;
-        while (Help[0] != 0)
-        {
-          Help[0] = toupper(Help[0]);
-          Help++;                       /* next char */
-        }
-      }
-
       /* select best search algorithm based on wildcard position */
 
       /*
-       *  no wildcard at all:
+       *  filename pattern without any wildcard:
        *  - simple string compare
        *  - stop when index data > request
        */
 
-      if (Pos == -1)
+      if (Pos == -1)               /* no wildcard at all */
       {
-        Check = strcmp(Name, Request->Name);
-        if (Check == 0) Match = True;         /* match */
-        else if (Check > 0) Run = False;      /* end loop */
+        Check = strcmp(Name, Requested);
+        if (Check == 0)            /* match */
+        {
+          Match = True;            /* add file */
+        }
+        else if (Check > 0)        /* index data > request */
+        {
+          Run = False;             /* end loop */
+        }
       }
 
       /*
-       *  wildcard, but not as first char:
+       *  filename pattern starting with some char(s) and a wildcard:
        *  - simple string compare for first part of request
        *  - on match perform pattern matching for remaining part
        *  - stop when index data > first part of request 
        */
       
-      else if (Pos > 0)
+      else if (Pos > 0)            /* wildcard follows */
       {
-        Check = strncmp(Name, Request->Name, Pos);
+        Check = strncmp(Name, Requested, Pos);
         if (Check == 0)               /* first part matches */
         {
           /* perform pattern matching */
-          /* todo: start at Pos */
-          if (MatchPattern(Name, Request->Name))
+          if (MatchPattern(Name, Requested))      /* match */
           {
-            Match = True;   /* match */
+            Match = True;             /* add file */
           }
         }
         else if (Check > 0)           /* index data > request */
         {
-          Run = False;                  /* end loop */
+          Run = False;                /* end loop */
         }
       }
 
       /*
-       *  first char is a wildcard:
+       *  filename pattern starts with a wildcard:
        *  - perform pattern matching
        *  - stop when we reach EOF (done by master loop anyway)
        */
 
-      else if (Pos == 0)
+      else if (Pos == 0)           /* first char is a wildcard */
       {
-        if (MatchPattern(Name, Request->Name)) Match = True;   /* match */
+        if (MatchPattern(Name, Requested))   /* match */
+        {
+          Match = True;            /* add file */
+        }
       }
     }
 
 
     /*
-     *  process match
+     *  prepare processing of matching file
+     *  - filepath
+     *  - response element
      */
 
-    if (Match)
+    if (Match)           /* got match */
     {
+      /*
+       *  <filepath>: <path>/[<filename>]
+       *              %<alias offset>%/[filename]
+       *  - %<alias offset>% for automatic path aliasing
+       *  - <filename> can be omitted if same as <name>
+       */
+
       /* automatic filepath */
       Length = strlen(Filepath);
       if (Filepath[Length - 1] == '/')       /* filename is missing */
       {
-        /* select original name */
-        if (AnyCase) Help = AliasBuffer;
-        else Help = Name;
-
         /* add filename to path */
         snprintf(TempBuffer2, DEFAULT_BUFFER_SIZE - 1,
-          "%s%s", Filepath, Help);
+          "%s%s", Filepath, Name);
         Filepath = TempBuffer2;
       }
 
@@ -1116,47 +1165,93 @@ _Bool SearchIndex(FILE *DataFile, FILE *AliasFile, Request_Type *Request, int Po
 
       /* create response element and add it to the request */
       Response = CreateResponseElement(Filepath);
-      if (Response)
+      if (Response)                /* got element */
       {
         if (Request->LastFile) Request->LastFile->Next = Response;
         else Request->Files = Response;
         Request->LastFile = Response;
       }
-      else
+      else                         /* error */
       {
-        Match = False;
+        Match = False;             /* skip file */
       }
+    }
 
-      /* check password if required */
-      if (Match && Password)
+
+    /*
+     *  check for any duplicate in current request
+     *  - caused by AnyCase search
+     *  - mark file if it's a duplicate
+     */
+
+    if (Match)           /* proceed with match */
+    {
+      if (DuplicateResponse(Request, Response))   /* is duplicate */
       {
-        /* check if the request password matches the index one */
-        if ((Request->PW == NULL) || (strcmp(Request->PW, Password) != 0))
-        {
-          Response->Status |= STAT_PWERROR;       /* set flag */
-          Match = False;                          /* skip file */
+        Response->Status |= RESP_INTDUPE;    /* set flag */
+        Match = False;                       /* skip file */
+      }
+    }
 
-          /* log PW error if not done later on */
-          if (!(Env->CfgSwitches & SW_LOG_REQUEST))
+
+    /*
+     *  check password (if required)
+     *  - mark file in case of a bad PW
+     *  - check limit for bad PWs
+     */
+
+    if (Match && Password)
+    {
+      /* check if the request password matches the index one */
+      if ((Request->PW == NULL) || (strcmp(Request->PW, Password) != 0))
+      {
+        Response->Status |= RESP_PWERROR;    /* set flag */
+        Match = False;                       /* skip file */
+
+        /* log PW error if not done later on */
+        if (!(Env->CfgSwitches & SW_LOG_REQUEST))
+        {
+          Help = GetFilename(Response->Filepath);
+          if (Help == NULL) Help = Response->Filepath;
+
+          if (Request->PW)
+            Log(L_INFO, "PW error: %s (req: %s !%s)", Help, Request->Name, Request->PW);
+          else
+            Log(L_INFO, "PW error: %s (req: %s)", Help, Request->Name);
+        }
+
+        /* manage limit */
+        BadPWs++;                       /* another bad PW */
+
+        if (Env->ActiveLimit)           /* sanity check */
+        {
+          /* check if limit for bad PWs is exceeded */
+          if ((Env->ActiveLimit->BadPWs >= 0) &&
+              (BadPWs > Env->ActiveLimit->BadPWs))
           {
-            Help = GetFilename(Response->Filepath);
-            if (Help == NULL) Help = Response->Filepath;
-            if (Request->PW)
-              Log(L_INFO, "PW error: %s (req: %s !%s)", Help, Request->Name, Request->PW);
-            else
-              Log(L_INFO, "PW error: %s (req: %s)", Help, Request->Name);
+            /* update global frequest status: PW limit exceeded */
+            Env->FreqStatus |= FREQ_PWLIMIT | FREQ_LIMIT;
+
+            Run = False;                     /* end loop */
           }
         }
       }
+    }
 
-      /* check for duplicate files */
-      if (Match)
+
+    /*
+     *  check for any duplicate in all requests
+     *  - to prevent sending the same file twice
+     *  - mark file if it's a duplicate
+     */
+
+    if (Match)
+    {
+      if (AnyDuplicateResponse(Response))    /* is duplicate */
       {
-        if (DuplicateResponse(Response))     /* this is a dupe */
-        {
-          Response->Status |= STAT_DUPE;     /* set flag */
-          Match = False;                     /* skip file */
-        }
+        Request->Status = FREQ_FOUND_FILE;   /* got a file */
+        Response->Status |= RESP_DUPE;       /* file is a dupe */
+        Match = False;                       /* skip file */
       }
     }
 
@@ -1169,7 +1264,7 @@ _Bool SearchIndex(FILE *DataFile, FILE *AliasFile, Request_Type *Request, int Po
     {
       Response->Size = GetFileSize(Response->Filepath);   /* get file size */
 
-      if (Response->Size > -1)          /* got it */
+      if (Response->Size > -1)          /* got file size */
       {
         Env->Bytes += Response->Size;   /* add to global counter */
         Env->Files++;                   /* increase global counter */
@@ -1180,39 +1275,53 @@ _Bool SearchIndex(FILE *DataFile, FILE *AliasFile, Request_Type *Request, int Po
           if ((Env->ActiveLimit->Files >= 0) &&
               (Env->Files > Env->ActiveLimit->Files))
           {
-            Response->Status |= STAT_FILELIMIT;
-            Run = False;                          /* end loop */
+            /* update global frequest status; file limit exceeded */
+            Env->FreqStatus |= FREQ_FILELIMIT | FREQ_LIMIT;
+
+            Match = False;                   /* skip file */
+            Run = False;                     /* end loop */
           }
 
           /* check if byte limit is exceeded */
           if ((Env->ActiveLimit->Bytes >= 0) &&
               (Env->Bytes > Env->ActiveLimit->Bytes))
           {
-            Response->Status |= STAT_BYTELIMIT;
-            Run = False;                          /* end loop */
+            /* update global frequest status: byte limit exceeded */
+            Env->FreqStatus |= FREQ_BYTELIMIT | FREQ_LIMIT;
+
+            Match = False;                   /* skip file */
+            Run = False;                     /* end loop */
           }
 
-          if (Run)                 /* no limit exceeded */
-          {
-            Response->Status |= STAT_OK;        /* ok to send */
-          }
-          else                     /* some limit is exceeded */
+          if (!Run)           /* some limit exceeded */
           {
             /* correct global counters */
             Env->Bytes -= Response->Size;
             Env->Files--;
-
-            /* update global frequest status */
-            Env->FreqStatus = Response->Status;
           }
         }
       }
       else                                 /* error */
       {
-        Response->Status |= STAT_OFFLINE;  /* currently not available */
+        Request->Status = FREQ_FOUND_FILE;   /* got a file */
+        Response->Status |= RESP_OFFLINE;    /* currently not available */
       }
     }
+
+
+    if (Match)                /* passed all checks */
+    {
+      if (Response->Status == RESP_NONE)     /* not set yet */
+      {
+        Response->Status |= RESP_OK;         /* ok to send */
+      }
+
+      Request->Status = FREQ_FOUND_FILE;     /* found a file */
+    }
   }
+
+  /* clean up */
+  if (Requested) free(Requested);
 
   return Flag;
 }
@@ -1223,6 +1332,7 @@ _Bool SearchIndex(FILE *DataFile, FILE *AliasFile, Request_Type *Request, int Po
  *  pre-search start position in index data file
  *  - binary search algorithm
  *  - sets the file offset for the real search
+ *  - doesn't support case-insensitive search
  *
  *  requires:
  *  - Request: requested file/pattern
@@ -1240,14 +1350,14 @@ off_t BinaryPreSearch(FILE *DataFile, FILE *OffsetFile, char *Request, int Pos, 
 {
   off_t             Offset = -1;             /* return value */
   _Bool             Run = False;             /* control flag */
-  _Bool             AnyCase = False;         /* case insensitive search */
-  IndexLookup_Type  *LookupElement;
+  IndexLookup_Type  *LookupElement;          /* lookup element */
   unsigned int      Start;                   /* lower filenumber */
   unsigned int      Stop;                    /* upper filenumber */
   unsigned int      Middle;                  /* middle filenumber */
-  unsigned int      Test;
+  unsigned int      Files;                   /* number of files */
+  unsigned int      Length;                  /* string length */
   int               Check;
-  off_t             TempOffset;
+  off_t             TempOffset;              /* file offset */
   char              *HelpStr;
 
   /* sanity checks */
@@ -1256,9 +1366,6 @@ off_t BinaryPreSearch(FILE *DataFile, FILE *OffsetFile, char *Request, int Pos, 
       (Request == NULL) ||
       (Pos == 0))
     return Offset;
-
-  /* check for case insensitive search */
-  if (Env->CfgSwitches & SW_ANY_CASE) AnyCase = True;
 
 
   /*
@@ -1272,7 +1379,11 @@ off_t BinaryPreSearch(FILE *DataFile, FILE *OffsetFile, char *Request, int Pos, 
   {
     Start = LookupElement->Start;
     Stop = LookupElement->Stop;
-    Run = True;                    /* ok to proceed */
+
+    if (Stop >= Start)             /* sanity check */
+    {
+      Run = True;                  /* ok to proceed */
+    }
   }
 
  /* todo:
@@ -1300,7 +1411,7 @@ off_t BinaryPreSearch(FILE *DataFile, FILE *OffsetFile, char *Request, int Pos, 
     TempOffset = sizeof(off_t) * (Middle - 1);     /* calculate offset */ 
 
     /* set file position */      
-    if (fseek(OffsetFile, TempOffset, SEEK_SET) == 0)
+    if (fseeko(OffsetFile, TempOffset, SEEK_SET) == 0)
     {
       /* read offset stored */
       if (fread(&TempOffset, sizeof(off_t), 1, OffsetFile) == 1)
@@ -1319,14 +1430,14 @@ off_t BinaryPreSearch(FILE *DataFile, FILE *OffsetFile, char *Request, int Pos, 
       Run = False;                      /* reset flag */
 
       /* set file position */      
-      if (fseek(DataFile, TempOffset, SEEK_SET) == 0)
+      if (fseeko(DataFile, TempOffset, SEEK_SET) == 0)
       {        
         /* read line */
         if (fgets(InBuffer, DEFAULT_BUFFER_SIZE, DataFile) != NULL)
         {
-          Test = strlen(InBuffer);
+          Length = strlen(InBuffer);
 
-          if ((Test > 0) && (InBuffer[0] != 10))    /* not empty */
+          if ((Length > 0) && (InBuffer[0] != 10))     /* not empty */
           {
             /* get filename */
             HelpStr = InBuffer;
@@ -1349,32 +1460,27 @@ off_t BinaryPreSearch(FILE *DataFile, FILE *OffsetFile, char *Request, int Pos, 
 
     if (Run)
     {
-      Test = Stop - Start + 1;          /* number of files */
-      if (Start == Middle) Test = 1;    /* special break condition */
-
-      /* case insensitive search */
-      if (AnyCase)
-      {
-        /* convert name to upper case */
-        HelpStr = InBuffer;
-        while (HelpStr[0] != 0)
-        {
-          HelpStr[0] = toupper(HelpStr[0]);
-          HelpStr++;                         /* next char */
-        }
-      }
+      Files = Stop - Start + 1;         /* number of files in span */
 
       /* compare strings */
-      if (Pos > 0) Check = strncmp(InBuffer, Request, Pos);
-      else Check = strcmp(InBuffer, Request);
+      if (Pos > 0)                 /* up to position of wildcard */
+      {
+        Check = strncmp(InBuffer, Request, Pos);
+      }
+      else                         /* complete strings */
+      {
+        Check = strcmp(InBuffer, Request);
+      }
 
       if (Check < 0)          /* filename < request */
       {
         Start = Middle;            /* proceed with upper half */
+        if (Start < Stop) Start++; /* don't re-check middle */
       }
       else if (Check > 0)     /* filename > request */
       {
         Stop = Middle;             /* proceed with lower half */
+        if (Stop > Start) Stop--;  /* don't re-check middle */
       }
       else                    /* filename = request */
       {
@@ -1383,10 +1489,9 @@ off_t BinaryPreSearch(FILE *DataFile, FILE *OffsetFile, char *Request, int Pos, 
       }
 
       /* just one file left */
-      if (Test == 1)          /* break condition */
+      if (Files == 1)         /* break condition */
       {
         Run = False;                    /* end loop anyway */
-        if (Offset == -1) Offset = -2;  /* signal "no match" */
       }
     }
   }
@@ -1409,7 +1514,7 @@ _Bool ProcessRequest()
   _Bool             Flag = True;             /* return value */
   _Bool             Run;                     /* loop control */
   _Bool             Result;                  /* result flag */
-  _Bool             AnyCase = False;         /* case insensitive search */
+  _Bool             Limit = False;           /* limits exceeded */
   _Bool             BinSearch = False;       /* binary search */
   Index_Type        *Index;                  /* file index list */
   Request_Type      *Request;                /* file request list */
@@ -1423,7 +1528,6 @@ _Bool ProcessRequest()
   char              Letter;                  /* first char */
 
   /* update flags based on configuration */
-  if (Env->CfgSwitches & SW_ANY_CASE) AnyCase = True;
   if (Env->CfgSwitches & SW_BINARY_SEARCH) BinSearch = True;
 
 
@@ -1481,7 +1585,7 @@ _Bool ProcessRequest()
         "%s."SUFFIX_ALIAS, Index->Filepath);
       AliasFile = fopen(TempBuffer, "r");         /* read mode */
 
-      /* open offset file */
+      /* open offset file (BinarySearch) */
       snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
         "%s."SUFFIX_OFFSET, Index->Filepath);
       OffsetFile = fopen(TempBuffer, "r");        /* read mode */
@@ -1524,6 +1628,12 @@ _Bool ProcessRequest()
     Request = Env->RequestList;       /* start of list */
     while (Run && Request)            /* follow request list */
     {
+      /* init request status */
+      if (Request->Status == FREQ_NONE)     /* no status yet */
+      { 
+        Request->Status = FREQ_NO_FILE;     /* "no file" by default */
+      }
+
       if (Request->Name)              /* sanity check */
       {
         /* check if we got any wildcards */
@@ -1550,7 +1660,7 @@ _Bool ProcessRequest()
         {
           Letter = Request->Name[0];
 
-          if (BinSearch)           /* binary pre-search */
+          if (BinSearch)                /* binary pre-search */
           {
             Offset = BinaryPreSearch(DataFile, OffsetFile, Request->Name, Pos, Letter);
           }
@@ -1566,42 +1676,19 @@ _Bool ProcessRequest()
         if (Offset >= 0)           /* valid offset */
         {
           /* set start position */
-          if (fseek(DataFile, Offset, SEEK_SET) == 0) 
+          if (fseeko(DataFile, Offset, SEEK_SET) == 0) 
           {
             Result = SearchIndex(DataFile, AliasFile, Request, Pos);
             if (!Result) Flag = False;            /* signal error */
           }
         }
+      }
 
-        /* extra round for case insensitive mode */
-        /* no fallback if lookup fails */
-        if (AnyCase && (Pos != 0))
-        {
-          Offset = -1;                            /* reset offset */
-          Letter = tolower(Request->Name[0]);     /* lower case */
-
-          if (BinSearch)           /* binary pre-search */
-          {
-            Offset = BinaryPreSearch(DataFile, OffsetFile, Request->Name, Pos, Letter);
-          }
-
-          if (Offset == -1)        /* no or failed binary pre-search */
-          {
-            /* get offset from lookup list for lower case char */
-            Offset = GetLetterOffset(Env->LookupList, Letter);
-          }
-
-          /* search index data file */
-          if (Offset >= 0)         /* valid offset */
-          {
-            /* set start position */
-            if (fseek(DataFile, Offset, SEEK_SET) == 0)
-            {
-              Result = SearchIndex(DataFile, AliasFile, Request, Pos);
-              if (!Result) Flag = False;          /* signal error */
-            }
-          }
-        }
+      /* any limits exceeded */
+      if (Env->FreqStatus & FREQ_LIMIT)
+      {
+        Limit = True;              /* set flag */
+        Run = False;               /* end loop (requests) */
       }
 
       Request = Request->Next;        /* next element */
@@ -1618,7 +1705,14 @@ _Bool ProcessRequest()
       Env->LastLookup = NULL;
     }
 
-    Index = Index->Next;                 /* next element */
+    if (Limit)                /* any limits exceeded */
+    {
+      Index = NULL;           /* end loop (indexes) */
+    }
+    else                      /* keep going */
+    {
+      Index = Index->Next;    /* next element */
+    }
   }
 
   return Flag;
@@ -1640,14 +1734,11 @@ _Bool ReadRequest()
 {
   _Bool                  Flag = False;        /* return value */
   _Bool                  Run = True;          /* loop control */
-  _Bool                  AnyCase = False;
   FILE                   *File;               /* filestream */
-  size_t                 Length;
-  Token_Type             *TokenList = NULL;
-  char                   *Password = NULL;
-  char                   *Help;
-
-  if (Env->CfgSwitches & SW_ANY_CASE) AnyCase = True;
+  int                    Freqs = 0;           /* number of frequests */
+  size_t                 Length;              /* string length */
+  Token_Type             *TokenList = NULL;   /* token list */
+  char                   *Password = NULL;    /* password */
 
   File = fopen(Env->RequestFilepath, "r");         /* read mode */
   if (File)
@@ -1698,9 +1789,24 @@ _Bool ReadRequest()
             /* we expect: <name> [!<password>] */
 
             TokenList = Tokenize(InBuffer);          /* tokenize line */
-            if (TokenList && TokenList->String)
+            if (TokenList && TokenList->String)      /* sanity check */
             {
-              /* check for PW (optional) */
+              Freqs++;                  /* another frequest */
+
+              /* check if limit for frequests is exceeded */
+              if (Env->ActiveLimit)           /* sanity check */
+              {
+                if ((Env->ActiveLimit->Freqs >= 0) &&
+                    (Freqs > Env->ActiveLimit->Freqs))
+                {
+                  /* update global frequest status: frequest limit exceeded */
+                  Env->FreqStatus |= FREQ_FREQLIMIT;
+
+                  Run = False;            /* end loop */
+                }
+              }
+
+              /* check for optional PW */
               if (TokenList->Next)                   /* got second token */
               {
                 Password = TokenList->Next->String;
@@ -1716,22 +1822,14 @@ _Bool ReadRequest()
                 }
               }
 
-              /* we ignore stuff following the password */
+              /* we ignore any stuff following the password */
 
-              if (AnyCase)     /* case-insensitive mode */
+              if (Run)
               {
-                /* convert search pattern to upper case */
-                Help = TokenList->String;
-                while (Help[0] != 0)
-                {
-                  Help[0] = toupper(Help[0]);
-                  Help++;       /* next char */
-                }
+                /* add request to global list */
+                AddRequestElement(TokenList->String, Password);
+                Password = NULL;                     /* reset string */
               }
-
-              /* add request to global list */
-              AddRequestElement(TokenList->String, Password);
-              Password = NULL;                       /* reset string */
 
               FreeTokenlist(TokenList);              /* free list */
               TokenList = NULL;
@@ -2064,12 +2162,14 @@ _Bool Add_Limit(Token_Type *TokenList)
   _Bool             Flag = False;            /* return value */
   _Bool             Run = True;              /* control flag */
   unsigned short    Keyword = 0;             /* keyword ID */
-  Token_Type        *AddressToken = NULL;
-  long              Files = -1;              /* number of files */
-  long long         Bytes = -1;              /* number pf bytes */
+  char              *Address = NULL;         /* FTS address patern */
+  long              Files = 20;              /* number of files */
+  long long         Bytes = 2000000;         /* number of bytes */
+  int               BadPWs = 2;              /* number of bad passwords */
+  int               Freqs = 10;              /* number of frequests (*/
   unsigned short    ReqFlags = REQ_NONE;     /* conditions */
-  static char       *Keywords[4] =
-    {"Limit", "Files", "Bytes", NULL};
+  static char       *Keywords[7] =
+    {"Limit", "Files", "Bytes", "BadPWs", "Freqs", "IfListed", NULL};
 
   /* sanity check */
   if (TokenList == NULL) return Flag;
@@ -2085,8 +2185,8 @@ _Bool Add_Limit(Token_Type *TokenList)
     {
       switch (Keyword)
       {
-        case 1:     /* address */
-          AddressToken = TokenList;
+        case 1:     /* FTS address pattern */
+          Address = TokenList->String;
           break;
 
         case 2:     /* files */
@@ -2097,6 +2197,16 @@ _Bool Add_Limit(Token_Type *TokenList)
         case 3:     /* bytes */
           Bytes = String2Bytes(TokenList->String);
           if (Bytes < -1) Run = False;
+          break;
+
+        case 4:     /* bad PWs */
+          BadPWs = Str2Long(TokenList->String);
+          if (BadPWs < -1) Run = False;
+          break;
+
+        case 5:     /* frequests (filename pattern) */
+          Freqs = Str2Long(TokenList->String);
+          if (Freqs < -1) Run = False;
       }
 
       Keyword = 0;            /* reset */
@@ -2111,7 +2221,7 @@ _Bool Add_Limit(Token_Type *TokenList)
           Run = False;
           break;
 
-        case 4:               /* if listed */
+        case 6:               /* if listed */
           ReqFlags |= REQ_LISTED;
           Keyword = 0;        /* reset keyword */
       }
@@ -2125,7 +2235,7 @@ _Bool Add_Limit(Token_Type *TokenList)
    *  check parser results
    */
 
-  if ((Run == False) || (Keyword > 0) || (AddressToken == NULL))
+  if ((Run == False) || (Keyword > 0) || (Address == NULL))
   {
     Run = False;
     LogCfgError();
@@ -2138,7 +2248,7 @@ _Bool Add_Limit(Token_Type *TokenList)
 
   if (Run)
   {
-    Flag = AddLimitElement(AddressToken->String, Files, Bytes, ReqFlags);
+    Flag = AddLimitElement(Address, Files, Bytes, BadPWs, Freqs, ReqFlags);
   }
 
   return Flag;
@@ -2876,7 +2986,8 @@ _Bool CheckConfig()
     /* create default limit if none set by cfg */
     if (Env->LimitList == NULL)
     {
-      AddLimitElement("*", 20, 2000000, REQ_NONE);
+      /* 20 files, 2000000 Bytes, 2 bad PWs, 10 Freqs */
+      AddLimitElement("*", 20, 2000000, 2, 10, REQ_NONE);
     }
   }
 
@@ -3169,7 +3280,7 @@ _Bool GetAllocations(void)
     Env->ActiveLimit = NULL;
     Env->Files = 0;
     Env->Bytes = 0;
-    Env->FreqStatus = STAT_OK;
+    Env->FreqStatus = FREQ_NONE;
     Env->ActiveLocalAKA = NULL;
     Env->ActiveRemoteAKA = NULL;
   }
@@ -3363,10 +3474,14 @@ int main(int argc, char *argv[])
       Flag &= WriteResponse();     /* write file list */
 
       /* log results */
-      if (Env->FreqStatus & STAT_FILELIMIT)
+      if (Env->FreqStatus & FREQ_FREQLIMIT)
+        Log(L_INFO, "frequest limit exceeded");
+      if (Env->FreqStatus & FREQ_FILELIMIT)
         Log(L_INFO, "file limit exceeded");
-      else if (Env->FreqStatus & STAT_BYTELIMIT)
+      if (Env->FreqStatus & FREQ_BYTELIMIT)
         Log(L_INFO, "byte limit exceeded");
+      if (Env->FreqStatus & FREQ_PWLIMIT)
+        Log(L_INFO, "bad PW limit exceeded");
 
       if (Bytes2String(Env->Bytes, TempBuffer, DEFAULT_BUFFER_SIZE))
         Log(L_INFO, "Totals: %ld files / %s", Env->Files, TempBuffer);

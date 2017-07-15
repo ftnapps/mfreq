@@ -2,7 +2,7 @@
  *
  *   mfreq-list
  *
- *   (c) 1994-2015 by Markus Reschke
+ *   (c) 1994-2017 by Markus Reschke
  *
  * ************************************************************************ */
 
@@ -845,7 +845,7 @@ _Bool Parse_files_bbs(char *Buffer, unsigned int Line, Info_Type **CurrentInfo)
             if (AddInfoElement(Data, 0 , 0))
             {
               Info = Env->LastInfo;
-              Info->Status = STAT_NOT_FOUND;
+              Info->Status = FINFO_NOT_FOUND;
               *CurrentInfo = Info;
             }
           }
@@ -868,13 +868,13 @@ _Bool Parse_files_bbs(char *Buffer, unsigned int Line, Info_Type **CurrentInfo)
 
           if (Value >= 0)   /* valid size */
           {
-            if (Info->Status & STAT_NOT_FOUND)   /* no value set yet */
+            if (Info->Status & FINFO_NOT_FOUND)   /* no value set yet */
             {
               Info->Size = Value;
             }
-            else if (Info->Size != Value)        /* sizes differ */
+            else if (Info->Size != Value)         /* sizes differ */
             {
-              Info->Status |= STAT_CHANGED;
+              Info->Status |= FINFO_CHANGED;
             }
           }
           else              /* invalid size */
@@ -927,7 +927,7 @@ _Bool Parse_files_bbs(char *Buffer, unsigned int Line, Info_Type **CurrentInfo)
             {
               /* later time than in files.bbs (date + 1 day) */
               if (Info->Time > UnixTime + (60 * 60 * 24))
-                Info->Status |= STAT_CHANGED;
+                Info->Status |= FINFO_CHANGED;
             }
           }
           else Flag = False;
@@ -1168,7 +1168,7 @@ _Bool Write_files_bbs(char *Path)
   Info = Env->InfoList;
   while (Run && Info)
   {
-    if (Info->Status & STAT_OK)      /* ok to list  */
+    if (Info->Status & FINFO_OK)   /* ok to list  */
     {
       Run = WriteInfo(File, Info, &(Env->Fields_files_bbs), 78);
     }
@@ -1340,9 +1340,9 @@ _Bool ScanPath(char *Path)
               {
                 /* set file status */
                 if (MatchExcludeList(File->d_name))
-                  Env->LastInfo->Status = STAT_EXCLUDED;
+                  Env->LastInfo->Status = FINFO_EXCLUDED;
                 else
-                  Env->LastInfo->Status = STAT_OK;
+                  Env->LastInfo->Status = FINFO_OK;
               }
             }
 
@@ -1477,7 +1477,7 @@ _Bool ProcessPath(char *Name, char *Path, char *AreaInfo)
 
     while (Info)                    /* follow list */
     {
-      if (Info->Status & STAT_OK)   /* if ok to list  */
+      if (Info->Status & FINFO_OK)  /* if ok to list  */
       {
         WriteInfo(Env->List, Info, &(Env->Fields_filelist), Limit);
       }

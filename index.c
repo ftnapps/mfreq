@@ -23,6 +23,9 @@
 #include "variables.h"        /* global variables */
 #include "functions.h"        /* external functions */
 
+/* strings */
+#include <ctype.h>
+
 
 
 /* ************************************************************************
@@ -71,6 +74,7 @@ _Bool AddDataElement(char *Name, char *Filepath, char *PW)
 {
   _Bool               Flag = False;        /* return value */
   IndexData_Type      *Element;            /* new element */
+  char                *Help;               /* string pointer */
 
   /* sanity check */
   if ((Name == NULL) || (Filepath == NULL)) return Flag;  
@@ -79,6 +83,18 @@ _Bool AddDataElement(char *Name, char *Filepath, char *PW)
 
   if (Element)          /* success */
   {
+    /* convert name to upper case for case-insensitive search */
+    if (Env->CfgSwitches & SW_ANY_CASE)
+    {
+      /* convert name to upper case */
+      Help = Name;
+      while (Help[0] != 0)
+      {
+        Help[0] = toupper(Help[0]);
+        Help++;                       /* next char */
+      }
+    }
+
     /* set defaults */
     Element->Next = NULL;
     Element->PW = NULL;
