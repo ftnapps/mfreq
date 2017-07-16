@@ -2,7 +2,7 @@
  *
  *   functions for request specific data management
  *
- *   (c) 1994-2015 by Markus Reschke
+ *   (c) 1994-2017 by Markus Reschke
  *
  * ************************************************************************ */
 
@@ -22,6 +22,9 @@
 #include "common.h"           /* common stuff */
 #include "variables.h"        /* global variables */
 #include "functions.h"        /* external functions */
+
+/* strings */
+#include <ctype.h>
 
 
 
@@ -355,17 +358,18 @@ _Bool AnyDuplicateResponse(Response_Type *Response)
 
 void FreeRequestList(Request_Type *List)
 {
-  Request_Type          *Next;
+  Request_Type           *Next;    /* pointer for next element */
 
   /* sanity check */
   if (List == NULL) return;
 
   while (List)
   {
-    Next = List->Next;           /* save pointer to next element */
+    Next = List->Next;             /* save pointer to next element */
 
     /* free data */
     if (List->Name) free(List->Name);
+    if ((List->SearchName) && (List->SearchName != List->Name)) free(List->SearchName);
     if (List->PW) free(List->PW);
     if (List->Files) FreeResponseList(List->Files);
 
@@ -388,8 +392,9 @@ void FreeRequestList(Request_Type *List)
 
 _Bool AddRequestElement(char *Name, char *Password)
 {
-  _Bool               Flag = False;        /* return value */
-  Request_Type        *Element;            /* new element */
+  _Bool             Flag = False;       /* return value */
+  Request_Type      *Element;           /* new element */
+  char              *Help;              /* support pointer */
 
   /* sanity check */
   if (Name == NULL) return Flag;
@@ -406,8 +411,28 @@ _Bool AddRequestElement(char *Name, char *Password)
     Element->Next = NULL;
 
     /* copy data */
-    Element->Name = CopyString(Name);
+    Element->Name = CopyString(Name);     /* original filename pattern */ 
     if (Password) Element->PW = CopyString(Password);
+
+    if (Env->CfgSwitches & SW_ANY_CASE)   /* case insensitive search */
+    {
+      Element->SearchName = CopyString(Name);     /* copy filename pattern */
+
+      if (Element->SearchName)
+      {
+        /* convert search pattern to upper case */
+        Help = Element->SearchName;
+        while (Help[0] != 0)
+        {
+          Help[0] = toupper(Help[0]);
+          Help++;                         /* next char */
+        }
+      }
+    }
+    else                                  /* cases sensitive search */
+    {
+      Element->SearchName = Element->Name;        /* same filename pattern */
+    }
 
     /* add new element to list */
     if (Env->LastRequest) Env->LastRequest->Next = Element;    /* just link */

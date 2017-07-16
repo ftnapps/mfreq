@@ -36,9 +36,9 @@
 
 /* about */
 #define PROJECT          "mfreq"
-#define VERSION          "v3.16"
+#define VERSION          "v3.17"
 #define VERSION_MAJOR    3
-#define VERSION_MINOR    16
+#define VERSION_MINOR    17
 #define COPYRIGHT        "(c) 1994-2017 by Markus Reschke"
 
 /* default paths */
@@ -284,7 +284,8 @@ typedef struct response
 /* requested file (linked list) */
 typedef struct request
 {
-  char              *Name;              /* file name or pattern */
+  char              *Name;              /* requested filename or pattern */
+  char              *SearchName;        /* filename pattern to search for */
   char              *PW;                /* password */
   unsigned short    Status;             /* request status */
   Response_Type     *Files;             /* files to send (linked list) */

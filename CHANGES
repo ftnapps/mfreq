@@ -6,6 +6,13 @@
 
 ------------------------------------------------------------------------------
 
+* 2017-07 / Version 3.17
+
+mfreq-srif:
+  - Bug fix: no file was found with AnyCase enabled for requests with a lower
+    case first character.
+
+
 * 2017-07 / Version 3.16
 
 all:

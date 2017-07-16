@@ -962,21 +962,8 @@ _Bool SearchIndex(FILE *DataFile, FILE *AliasFile, Request_Type *Request, int Po
       (Request == NULL))
     return False;
 
-  /* local copy of requested file pattern */
-  Requested = CopyString(Request->Name);
+  Requested = Request->SearchName;
   if (Requested == NULL) return False;
-
-  /* setup for case insensitive search */
-  if (Env->CfgSwitches & SW_ANY_CASE)   /* case insensitive search */
-  {
-    /* convert search pattern to upper case */
-    Help = Requested;
-    while (Help[0] != 0)
-    {
-      Help[0] = toupper(Help[0]);
-      Help++;                           /* next char */
-    }
-  }
 
   while (Run)                 /* processing loop */
   {
@@ -1320,9 +1307,6 @@ _Bool SearchIndex(FILE *DataFile, FILE *AliasFile, Request_Type *Request, int Po
     }
   }
 
-  /* clean up */
-  if (Requested) free(Requested);
-
   return Flag;
 }
 
@@ -1521,7 +1505,7 @@ _Bool ProcessRequest()
   FILE              *DataFile;               /* index data file */
   FILE              *AliasFile;              /* index alias file */
   FILE              *OffsetFile;             /* index offset file */
-  char              *Help;
+  char              *Help;                   /* support pointer */
   int               Pos;                     /* position of first wildcard */
                                              /* -1: no wildcard at all */
   off_t             Offset;                  /* file offset */
@@ -1634,10 +1618,10 @@ _Bool ProcessRequest()
         Request->Status = FREQ_NO_FILE;     /* "no file" by default */
       }
 
-      if (Request->Name)              /* sanity check */
+      if (Request->SearchName)              /* sanity check */
       {
         /* check if we got any wildcards */
-        Help = Request->Name;
+        Help = Request->SearchName;
         Pos = 0;
         Offset = -1;
 
@@ -1658,11 +1642,11 @@ _Bool ProcessRequest()
         }
         else                       /* first char of request is no wildcard */
         {
-          Letter = Request->Name[0];
+          Letter = Request->SearchName[0];
 
           if (BinSearch)                /* binary pre-search */
           {
-            Offset = BinaryPreSearch(DataFile, OffsetFile, Request->Name, Pos, Letter);
+            Offset = BinaryPreSearch(DataFile, OffsetFile, Request->SearchName, Pos, Letter);
           }
 
           if (Offset == -1)        /* no or failed binary pre-search */
