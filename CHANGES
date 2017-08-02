@@ -6,6 +6,23 @@
 
 ------------------------------------------------------------------------------
 
+* 2017-07 / Version 3.18
+
+all:
+  - Added logging for bad or unknown keywords.
+
+mfreq-list:
+  - Added support for directory recursion and introduced filearea.bbs for
+    filarea names.
+  - Fixed problem with right-justified data fields in parser for files.bbs (
+    reported by Ingo Jürgensmann 2:2452/413)
+  - Fixed issue with error handling in Cmd_Define_filelist() (reported by
+    Ingo Jürgensmann 2:2452/413.
+
+mfreq-srif:
+  - Added support for SRIF statements CallerID and SessionType. 
+
+
 * 2017-07 / Version 3.17
 
 mfreq-srif:

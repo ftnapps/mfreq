@@ -1860,9 +1860,10 @@ _Bool ParseSRIF(Token_Type *TokenList)
   _Bool                  Flag = False;       /* return value */
   _Bool                  Run = True;         /* control flag */
   unsigned short         Keyword = 0;        /* keyword ID */
-  static char            *Keywords[10] =
+  static char            *Keywords[12] =
     {"Sysop", "AKA", "Baud", "Time", "RequestList",
-     "ResponseList", "RemoteStatus", "SystemStatus", "OurAKA", NULL};
+     "ResponseList", "RemoteStatus", "SystemStatus", "OurAKA", "CallerID",
+     "SessionType", NULL};
   AKA_Type               *AKA;
 
   /* sanity checks */
@@ -1962,6 +1963,26 @@ _Bool ParseSRIF(Token_Type *TokenList)
             Env->CalledAKA = AKA;
           }
           break;
+
+        case 10:    /* Caller ID (optional) */
+          if (Env->CallerID)            /* free old one */
+          {
+            free(Env->CallerID);
+            Env->CallerID = NULL;
+          }
+          /* in case the caller ID has several parts (tokens) */
+          Env->CallerID = UnTokenize(TokenList);
+          break;
+
+        case 11:    /* session type (optional) */
+          if (Env->SessionType)         /* free old one */
+          {
+            free(Env->SessionType);
+            Env->SessionType = NULL;
+          }
+          /* copy session type */
+          Env->SessionType = CopyString(TokenList->String);
+          break;
       }
 
       Keyword = 0;             /* reset */
@@ -1979,7 +2000,7 @@ _Bool ParseSRIF(Token_Type *TokenList)
 
   /*
    *  Since some statements are optional and even might lack data
-   *  we assume everything's fine :-)
+   *  we assume everything's fine :)
    */
 
   Flag = True;
@@ -2047,7 +2068,7 @@ _Bool ReadSRIF()
 
             if (TokenList)
             {
-              Flag = ParseSRIF(TokenList);
+              Flag = ParseSRIF(TokenList);           /* parse line */
               if (Flag == False) Run = False;        /* end loop on error */
               FreeTokenlist(TokenList);              /* free linked list */
             }
@@ -2122,6 +2143,25 @@ _Bool CheckSRIF()
   }
 
   return Flag;
+}
+
+
+
+/* ************************************************************************
+ *   configuration parser support
+ * ************************************************************************ */
+
+
+/*
+ *  log warning for bad or unknown keyword
+ */
+
+void LogBadKeyword(char *KeyWord)
+{
+  if (KeyWord)      /* sanity check */
+  {
+    Log(L_WARN, "Bad or unknown Keyword: %s!", KeyWord);
+  }
 }
 
 
@@ -2203,6 +2243,7 @@ _Bool Add_Limit(Token_Type *TokenList)
       {
         case 0:               /* unknown keyword */
           Run = False;
+          LogBadKeyword(TokenList->String);
           break;
 
         case 6:               /* if listed */
@@ -2470,7 +2511,11 @@ _Bool Add_Index(Token_Type *TokenList)
     {
       Keyword = GetKeyword(Keywords, TokenList->String);
 
-      if (Keyword == 0) Run = False;    /* unknown keyword */
+      if (Keyword == 0)       /* unknown keyword */
+      {
+        Run = False;
+        LogBadKeyword(TokenList->String);
+      }
     }
 
     TokenList = TokenList->Next;     /* goto to next token */
@@ -2615,6 +2660,7 @@ _Bool Set_Mode(Token_Type *TokenList)
     {
       case 0:       /* unknown keyword */
         Run = False;
+        LogBadKeyword(TokenList->String);
         break;
 
       case 1:       /* command itself */
@@ -3257,6 +3303,8 @@ _Bool GetAllocations(void)
     Env->BPS = 0;
     Env->ReqTime = 0;
     Env->ReqFlags = REQ_NONE;
+    Env->CallerID = NULL;
+    Env->SessionType = NULL;
     Env->RequestList = NULL;
     Env->LastRequest = NULL;
 
@@ -3294,6 +3342,8 @@ void FreeAllocations()
     if (Env->MailFilepath) free(Env->MailFilepath);
     if (Env->TextFilepath) free(Env->TextFilepath);
     if (Env->Sysop) free(Env->Sysop);
+    if (Env->CallerID) free(Env->CallerID);
+    if (Env->SessionType) free(Env->SessionType);
 
     /* free lists */
     if (Env->MailHeader) FreeTokenlist(Env->MailHeader);
@@ -3431,8 +3481,16 @@ int main(int argc, char *argv[])
     /* log request */
     Log(L_INFO, "Request from %s %s",
       Env->Sysop, Env->ActiveRemoteAKA->Address);
+    if (Env->CallerID)                  /* caller ID available */
+    {
+      Log(L_INFO, "Caller ID: %s", Env->CallerID);
+    }
+    if (Env->SessionType)               /* session type available */
+    {
+      Log(L_INFO, "Session Type: %s", Env->SessionType);
+    }
 
-    ActivateLimits();         /* find rule for frequest limits */
+    ActivateLimits();         /* apply rule for frequest limits */
 
     if (ReadRequest())        /* read request */
     {

@@ -647,6 +647,7 @@ _Bool Parse_files_bbs(char *Buffer, unsigned int Line, Info_Type **CurrentInfo)
 {
   _Bool             Flag = False;       /* return value */
   _Bool             Skip = False;       /* skip flag */
+  _Bool             More;               /* more fields flag */
   unsigned short    Pos;                /* position in string */
   unsigned short    NewPos;             /* new position in string */
   unsigned short    Width;              /* sub-string width */
@@ -767,54 +768,96 @@ _Bool Parse_files_bbs(char *Buffer, unsigned int Line, Info_Type **CurrentInfo)
       /* separate data field */
       if ((!Skip) && Flag)
       {
-        Length = strlen(Data);
+        More = False;                   /* reset flag */
+        Length = strlen(Data);          /* length of remaining line */
 
-        /* if another field follows */
-        if ((Field->Width > 0 ) && (Length > Field->Width))
+        /* process field based on alignment */
+        if (Field->Align == ALIGN_LEFT)           /* aligned left */
         {
-          /* we search from right to left */
-          /* allowing spaces inside the data field */
-          Str = &Data[Field->Width];   /* char behind field (space) */
-          Width = Field->Width + 1;    /* same here */
-          NewData = &Data[Width];      /* points to second char behind field */
-          NewPos = Pos + Width;        /* same here */
-
-          /* skip spaces (right to left) */
-          while (Str[0] == ' ')
+          /* another field follows */
+          if ((Field->Width > 0 ) && (Length > Field->Width))
           {
-            Str--;
-            Width--;
-          }
+            /* we search from right to left */
+            /* allowing spaces inside the data field */
+            Str = &Data[Field->Width];   /* points to space after field */
+            Width = Field->Width + 1;    /* field width plus space */
+            NewData = &Data[Width];      /* points to second char after field */
+            NewPos = Pos + Width;        /* position of second char after field */
 
-          /* process result */
-          if (Width <= Field->Width)   /* found the data field's end */
-          {
-            /* create sub-string */
-            Str++;       /* char behind field (space) */
-            Str[0] = 0;
-          }
-          else                         /* max. width exceeded */
-          {
-            Flag = False;    /* end loop */
-          }
+            /* skip spaces (right to left) */
+            while (Str[0] == ' ')
+            {
+              Str--;
+              Width--;
+            }
 
-          /* check end position if strict checking is enabled */
-          /* just for right aligned data */
-          if ((Env->InfoMode & INFO_STRICT) &&
-              (Field->Align == ALIGN_RIGHT))
-          {
-            /* end has to be within data fields position range */
-            if (Pos + Width > Field->Pos + Field->Width) Flag = False;
-            /* problem: if Field->Width is zero */
-          }
+            /* check for valid width */
+            if (Width <= Field->Width)   /* within valid range */
+            {
+              /* create sub-string */
+              Str++;          /* char behind field (space) */
+              Str[0] = 0;
+            }
+            else                         /* max. width exceeded */
+            {
+              Flag = False;    /* end loop */
+            }
 
-          if (!Flag) Log(L_WARN, "Maximum field width exceeded (line %d)!", Line);
+            More = True;           /* another field follows */
+          }
         }
-        else    /* it's the last data field */
+        else if (Field->Align == ALIGN_RIGHT)     /* aligned right */
         {
+          if (Field->Width > 0)         /* sanity check */
+          {
+            /* we assume that right-justified data fields don't have any spaces */
+
+            /* search for next space */
+            Str = Data;                 /* start of field */
+            Width = 0;                  /* field width */
+            while ((Str[0] != ' ') && (Str[0] != 0))
+            {
+              Width++;                 /* got another char */
+              Str++;                   /* next char */
+            }
+
+            if (Str[0] == ' ')         /* found space */
+            {
+              /* check for valid width */
+              if (Width <= Field->Width)   /* within valid range */
+              {
+                Str[0] = 0;                /* create sub-string */
+              }
+              else                         /* max. width exceeded */
+              {
+                Flag = False;              /* end loop */
+              }              
+
+              /* check end position if strict checking is enabled */
+              if (Env->InfoMode & INFO_STRICT)
+              {
+                /* end has to be within data field's range */
+                if (Pos + Width > Field->Pos + Field->Width) Flag = False;
+              }
+
+              NewData = Str;         /* points to space after field */
+              NewData++;             /* char after space */
+              NewPos = Pos + Width + 1;  /* position of second char after field */
+              More = True;           /* another field follows */
+            }
+            /* else: end of string */
+          }
+        }
+
+        if (!Flag) Log(L_WARN, "Maximum field width exceeded (line %d)!", Line);
+
+        /* no other field follows */
+        if (More == False)
+        {
+          /* it's the last data field */
           NewData = &Data[Length];    /* points to trailing 0 */
-          NewPos = Pos + Length;
-          Width = Length;
+          NewPos = Pos + Length;      /* position of trailing 0 */
+          Width = Length;             /* length of remaining line */
         }
       }
 
@@ -1190,7 +1233,7 @@ _Bool Write_files_bbs(char *Path)
 
 
 /*
- *  read dir.bbs
+ *  read dir.bbs (filearea's description)
  *
  *  returns:
  *  - string pointer (new allocation) on success
@@ -1200,10 +1243,10 @@ _Bool Write_files_bbs(char *Path)
 char *Read_dir_bbs(char *Path)
 {
   char              *Info = NULL;       /* return value */
-  _Bool             Run = True;
-  unsigned short    Check;
-  FILE              *File;
-  size_t            Length;
+  _Bool             Run = True;         /* control flag */
+  unsigned short    Check;              /* loop control */
+  FILE              *File;              /* file stream */
+  size_t            Length;             /* string length */
 
   /* sanity check */
   if (Path == NULL) return Info;
@@ -1212,13 +1255,26 @@ char *Read_dir_bbs(char *Path)
   Check = 2;
   while (Check > 0)
   {
-    if (Check == 2) snprintf(TempBuffer2, DEFAULT_BUFFER_SIZE - 1, "dir.bbs");
-    else if (Check == 1) snprintf(TempBuffer2, DEFAULT_BUFFER_SIZE - 1, "DIR.BBS");
+    if (Check == 2)                /* lower case */
+    {
+      snprintf(TempBuffer2, DEFAULT_BUFFER_SIZE - 1, "dir.bbs");
+    }
+    else if (Check == 1)           /* upper case */
+    {
+      snprintf(TempBuffer2, DEFAULT_BUFFER_SIZE - 1, "DIR.BBS");
+    }
 
     snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1, "%s/%s", Path, TempBuffer2);
+
     File = fopen(TempBuffer, "r");         /* read mode */    
-    if (File == NULL) Check--;
-    else Check = 0;
+    if (File == NULL)                   /* error */
+    {
+      Check--;                          /* try other one */
+    }
+    else                                /* file opened */
+    {
+      Check = 0;                        /* end loop */
+    }
   }
 
   if (File)        /* file opened */
@@ -1228,7 +1284,7 @@ char *Read_dir_bbs(char *Path)
     /* read just one line */
     if (fgets(InBuffer, DEFAULT_BUFFER_SIZE, File) != NULL)
     {
-      Length = strlen(InBuffer);
+      Length = strlen(InBuffer);        /* length of line */
 
       if (Length == 0)                  /* sanity check */
       {
@@ -1274,6 +1330,116 @@ char *Read_dir_bbs(char *Path)
   else             /* file error */
   {
     Log(L_WARN, "Couldn't open neither dir.bbs nor DIR.BBS!");
+  }
+
+  return Info;
+}
+
+
+
+/* ************************************************************************
+ *   filearea.bbs
+ * ************************************************************************ */
+
+
+/*
+ *  read filearea.bbs (filearea's name)
+ *
+ *  returns:
+ *  - string pointer (new allocation) on success
+ *  - NULL on error
+ */
+
+char *Read_filearea_bbs(char *Path)
+{
+  char              *Info = NULL;       /* return value */
+  _Bool             Run = True;         /* control flag */
+  unsigned short    Check;              /* loop control */
+  FILE              *File;              /* file stream */
+  size_t            Length;             /* string length */
+
+  /* sanity check */
+  if (Path == NULL) return Info;
+
+  /* try to open dir.bbs or DIR.BBS */
+  Check = 2;
+  while (Check > 0)
+  {
+    if (Check == 2)                /* lower case */
+    {
+      snprintf(TempBuffer2, DEFAULT_BUFFER_SIZE - 1, "filearea.bbs");
+    }
+    else if (Check == 1)           /* upper case */
+    {
+      snprintf(TempBuffer2, DEFAULT_BUFFER_SIZE - 1, "FILEAREA.BBS");
+    }
+
+    snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1, "%s/%s", Path, TempBuffer2);
+
+    File = fopen(TempBuffer, "r");         /* read mode */    
+    if (File == NULL)                   /* error */
+    {
+      Check--;                          /* try other one */
+    }
+    else                                /* file opened */
+    {
+      Check = 0;                        /* end loop */
+    }
+  }
+
+  if (File)        /* file opened */
+  {
+    Log(L_INFO, "Reading: %s", TempBuffer2);
+
+    /* read just one line */
+    if (fgets(InBuffer, DEFAULT_BUFFER_SIZE, File) != NULL)
+    {
+      Length = strlen(InBuffer);        /* length of line */
+
+      if (Length == 0)                  /* sanity check */
+      {
+        Run = False; 
+      }
+      else if (Length == (DEFAULT_BUFFER_SIZE - 1))         /* maximum size reached */
+      {
+        /* now check if line matches buffer size exacly or exceeds it */
+        /* exact matches should have a LF as last character in front of the trailing 0 */
+        if (InBuffer[Length - 1] != 10)             /* pre-last char is not LF */
+        {
+          Run = False;                         /* end loop */
+          Log(L_WARN, "Input overflow for %s!", TempBuffer2);
+        }
+      }
+
+      if (Run)       /* if still in business */
+      {
+        /* remove LF at end of line */
+        if (InBuffer[Length - 1] == 10)
+        {
+          InBuffer[Length - 1] = 0;
+          Length--;
+        }
+
+        /* remove CR at end of line */
+        if (InBuffer[Length - 1] == 13)
+        {
+          InBuffer[Length - 1] = 0;
+          Length--;
+        }        
+
+        /* if it's not an empty line */
+        if (InBuffer[0] != 0)
+        {
+          Info = CopyString(InBuffer);
+        }
+      }
+    }
+
+    fclose(File);            /* close file */
+  }
+  else             /* file error */
+  {
+    Log(L_WARN, "Couldn't open neither filearea.bbs nor FILEAREA.BBS!");
   }
 
   return Info;
@@ -1368,7 +1534,7 @@ _Bool ScanPath(char *Path)
       }
     }
 
-    chdir(Env->CWD);            /* change current directory back */
+    chdir(Env->CWD);            /* move back to start directory */
     closedir(Directory);        /* close directory */
   }
 
@@ -1400,11 +1566,9 @@ _Bool ProcessPath(char *Name, char *Path, char *AreaInfo)
 
   Flag = True;
 
-  Log(L_INFO, "Processing path: %s", Path);
-
 
   /*
-   *  scan directory and get file descriptions
+   *  directory specific info
    */
 
   /* dir.bbs (preceded by info) */
@@ -1414,8 +1578,16 @@ _Bool ProcessPath(char *Name, char *Path, char *AreaInfo)
     if (DirBBS == NULL) Flag = False;
   }
 
+
+  /*
+   *  scan directory and get file descriptions
+   */
+
   /* scan path for available files */
-  if (Flag) Flag = ScanPath(Path);
+  if (Flag)
+  {
+    Flag = ScanPath(Path);
+  }
 
   /* read file description files */ 
   if (Flag)
@@ -1505,9 +1677,180 @@ _Bool ProcessPath(char *Name, char *Path, char *AreaInfo)
 
 
 
+/*
+ *  manage path processing
+ *  - supports recursive directory processing
+ *
+ *  returns:
+ *  - 1 on success
+ *  - 0 on error
+ */
+
+_Bool ManagePath(char *Name, char *Path, char *AreaInfo, int Depth, _Bool SubFlag)
+{
+  _Bool             Flag = False;       /* return value */
+  _Bool             Run = True;         /* control flag */
+  DIR               *Directory;         /* directory stream */
+  struct dirent     *File;              /* directory entry */
+  struct stat       FileData;           /* file details */
+  int               Error;              /* error ID */
+  long              FileCounter = 0;    /* file counter */
+  char              *AltName = NULL;    /* alternative name */
+  char              *LocalPath = NULL;  /* local path */
+  char              *SubName = NULL;    /* sub directory's name */
+  char              *SubPath = NULL;    /* sub directory's path */
+
+  /* sanity checks */
+  if ((Name == NULL) || (Path == NULL)) return Flag;
+
+  Log(L_INFO, "Processing path: %s", Path);
+
+
+  /*
+   *  check for filearea.bbs in case of a sub-dir 
+   */
+
+  if (SubFlag)                /* this is a sub directory */
+  {
+    /* check for filearea.bbs */
+    AltName = Read_filearea_bbs(Path);
+
+    if (AltName)              /* filearea.bbs available */
+    {
+      /* use filearea.bbs for areaname */
+      Name = AltName;
+    }
+  }
+
+
+  /*
+   *  first do the directory itself
+   */
+
+  Flag = ProcessPath(Name, Path, AreaInfo);
+  if (!Flag) return Flag;
+
+
+  /*
+   *  then look for sub-directories
+   */
+
+  /* build absolute path if necessary */
+  if (Path[0] != '/')      /* relative path */
+  {
+    snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
+      "%s/%s", Env->CWD, Path);
+    LocalPath = CopyString(TempBuffer);
+    Path = LocalPath;
+  }
+
+  Directory = opendir(Path);    /* open directory */
+  if (Directory == NULL)        /* error */
+  {
+    Log(L_WARN, "Can't access directory: %s!", Path);
+  }
+  else                          /* success */
+  {
+    if (chdir(Path) != 0)       /* change current directory to path */ 
+    {                           /* to simplify lstat later on */ 
+      Run = False;
+    }
+
+    /* get all directory entries and check for sub directories */
+    while (Run)
+    {
+      Error = errno;                 /* save current error ID */
+      File = readdir(Directory);     /* get next file */
+      if (File)                      /* got it */
+      {
+        /* check file type */
+        if (lstat(File->d_name, &FileData) == 0)
+        {
+          if (S_ISDIR(FileData.st_mode))     /* directory */
+          {
+            /* copy file name (File isn't re-entrant) */
+            snprintf(TempBuffer2, DEFAULT_BUFFER_SIZE - 1, "%s", File->d_name);
+
+            /* enter recursion but skip "." and ".." */
+            if ((Depth > 0) &&
+                (strcmp(TempBuffer2, ".") != 0) &&
+                (strcmp(TempBuffer2, "..") != 0))
+            {
+              /* create path for sub-dir */
+              snprintf(TempBuffer, DEFAULT_BUFFER_SIZE - 1,
+                "%s/%s", Path, TempBuffer2);
+              SubPath = CopyString(TempBuffer);
+
+              /* copy sub-dir's name */
+              SubName = CopyString(TempBuffer2);
+
+              /* call me resursively with a decreased depth */
+              Flag = ManagePath(SubName, SubPath, AreaInfo, Depth - 1, True);
+              if (!Flag) Run = False;   /* end loop on error */
+
+              if (SubName)         /* free name */
+              {
+                free(SubName);
+                SubName = NULL;
+              }
+
+              if (SubPath)         /* free path */
+              {
+                free(SubPath);
+                SubPath = NULL;
+              }
+
+              FileCounter++;       /* increase counter */
+              chdir(Path);         /* move back to current directory */
+            }
+          }
+        }
+      }
+      else                         /* error or no more entries */
+      {
+        Run = False;                   /* end loop */
+
+        /* check for empty directory */
+        if (errno == Error)            /* no more entries */
+        {
+          if (FileCounter == 0)        /* no valid sub-dirs found */
+          {
+            Flag = True;               /* signal success */
+          }
+        }
+      }
+    }
+
+    chdir(Env->CWD);            /* move back to start directory */
+    closedir(Directory);        /* close directory */
+  }
+
+  /* clean up */
+  if (LocalPath) free(LocalPath);
+  if (AltName) free(AltName);
+
+  return Flag;
+}
+
+
+
 /* ************************************************************************
  *   command parser support
  * ************************************************************************ */
+
+
+/*
+ *  log warning for bad or unknown keyword
+ */
+
+void LogBadKeyword(char *KeyWord)
+{
+  if (KeyWord)      /* sanity check */
+  {
+    Log(L_WARN, "Bad or unknown Keyword: %s!", KeyWord);
+  }
+}
+
 
 
 /*
@@ -1676,6 +2019,7 @@ _Bool Cmd_Include(Token_Type *TokenList)
       {
         case 0:          /* unknown keyword */
           Run = False;
+          LogBadKeyword(TokenList->String);
           break;
 
         case 1:          /* command itself */
@@ -1783,7 +2127,11 @@ _Bool Cmd_Define_files_bbs(Token_Type *TokenList)
             NamePos = 1;
             NameFormat = FIELD_FORM_LONG;
           }
-          else Run = False;       /* unknown keyword */
+          else                /* unknown keyword */
+          {
+            Run = False;
+            LogBadKeyword(TokenList->String);
+          }
           break;
 
         case 4:          /* size position */
@@ -1806,7 +2154,11 @@ _Bool Cmd_Define_files_bbs(Token_Type *TokenList)
             SizeFormat = FIELD_FORM_SHORT;
             SizeWidth = 8;
           }
-          else Run = False;       /* unknown keyword */
+          else               /* unknown keyword */
+          {
+            Run = False;
+            LogBadKeyword(TokenList->String);
+          }
           break;
 
         case 6:          /* date position */
@@ -1824,7 +2176,11 @@ _Bool Cmd_Define_files_bbs(Token_Type *TokenList)
             DateFormat = FIELD_FORM_ISO;
             DateWidth = 10;
           }
-          else Run = False;       /* unknown keyword */
+          else                /* unknown keyword */
+          {
+            Run = False;
+            LogBadKeyword(TokenList->String);
+          }
           break;
 
         case 8:          /* counter position */
@@ -1847,7 +2203,11 @@ _Bool Cmd_Define_files_bbs(Token_Type *TokenList)
             CounterFormat = FIELD_FORM_SQUARE;
             CounterWidth = 6;
           }
-          else Run = False;       /* unknown keyword */
+          else                /* unknown keyword */
+          {
+            Run = False;
+            LogBadKeyword(TokenList->String);
+          }
           break;
 
         case 10:         /* description position */
@@ -1860,7 +2220,11 @@ _Bool Cmd_Define_files_bbs(Token_Type *TokenList)
     {
       Keyword = GetKeyword(Keywords, TokenList->String);
 
-      if (Keyword == 0) Run = False;    /* unknown keyword */ 
+      if (Keyword == 0)            /* unknown keyword */
+      {
+        Run = False;
+        LogBadKeyword(TokenList->String);
+      }
     }
 
     TokenList = TokenList->Next;     /* next token */
@@ -2047,7 +2411,11 @@ _Bool Cmd_Define_filelist(Token_Type *TokenList)
           {
             NameFormat = FIELD_FORM_LONG;
           }
-          else Run = False;       /* unknown keyword */
+          else                /* unknown keyword */
+          {
+            Run = False;
+            LogBadKeyword(TokenList->String);
+          }
           break;
 
         case 5:               /* size position */
@@ -2071,7 +2439,11 @@ _Bool Cmd_Define_filelist(Token_Type *TokenList)
           {
             SizeFormat = FIELD_FORM_SHORT;
           }
-          else Run = False;       /* unknown keyword */
+          else                /* unknown keyword */
+          {
+            Run = False;
+            LogBadKeyword(TokenList->String);
+          }
           break;
 
         case 8:          /* date position */
@@ -2089,7 +2461,11 @@ _Bool Cmd_Define_filelist(Token_Type *TokenList)
             DateFormat = FIELD_FORM_ISO;
             DateWidth = 10;
           }
-          else Run = False;       /* unknown keyword */
+          else                /* unknown keyword */
+          {
+            Run = False;
+            LogBadKeyword(TokenList->String);
+          }
           break;
 
         case 10:      /* counter position */
@@ -2112,7 +2488,11 @@ _Bool Cmd_Define_filelist(Token_Type *TokenList)
             CounterFormat = FIELD_FORM_SQUARE;
             CounterWidth = 6;
           }
-          else Run = False;       /* unknown keyword */
+          else                /* unknown keyword */
+          {
+            Run = False;
+            LogBadKeyword(TokenList->String);
+          }
           break;
 
         case 12:      /* description position */
@@ -2129,10 +2509,14 @@ _Bool Cmd_Define_filelist(Token_Type *TokenList)
     {
       Keyword = GetKeyword(Keywords, TokenList->String);
 
-      if (Keyword == 0) Run = False;     /* unknown keyword */ 
+      if (Keyword == 0)                 /* unknown keyword */ 
+      {
+        Run = False;
+        LogBadKeyword(TokenList->String);
+      }
     }
 
-    TokenList = TokenList->Next;     /* next token */
+    TokenList = TokenList->Next;        /* next token */
   }
 
 
@@ -2206,9 +2590,9 @@ _Bool Cmd_Define_filelist(Token_Type *TokenList)
     /* description needs to be the last field */
     if (DescPos > 0)
     {
-      Run = False;         /* reset flag */
+      Check = 0;
 
-      /* find larget line-position */
+      /* find largest line number or rightmost position */
       TempLine = 0;
       TempPos = 0;
 
@@ -2218,22 +2602,30 @@ _Bool Cmd_Define_filelist(Token_Type *TokenList)
       if (DateLine > TempLine) TempLine = DateLine;
       if (CounterLine > TempLine) TempLine = CounterLine;
 
-      /* if descriptions line number is largest */
-      if (DescLine > TempLine) Run = True;
+      /* description's line number is the largest */
+      if (DescLine > TempLine)
+      {
+        Check = 1;                      /* ok */
+      }
 
-      /* if descriptions line number matches check for position */
+      /* description's line number matches last line */
       else if (DescLine == TempLine)
       {
-        /* find largest position */
+        /* find rightmost position */
         if ((NameLine == TempLine) && (NamePos > TempPos)) TempPos = NamePos;
         if ((SizeLine == TempLine) && (SizePos > TempPos)) TempPos = SizePos;
         if ((DateLine == TempLine) && (DatePos > TempPos)) TempPos = DatePos;
         if ((CounterLine == TempLine) && (CounterPos > TempPos)) TempPos = CounterPos;
 
-        if (DescPos > TempPos) Run = True;
+        /* description's position is the rightmost */
+        if (DescPos > TempPos) Check = 1;         /* ok */
       }
 
-      if (!Run) Log(L_WARN, "Description must be at the end of the (last) line!");
+      if (Check == 0)         /* syntax problem */
+      {
+        Run = False;
+        Log(L_WARN, "Description must be at the end of the (last) line!");
+      }
     }
   }
 
@@ -2316,7 +2708,11 @@ _Bool Cmd_Define(Token_Type *TokenList)
         Flag = Cmd_Define_filelist(TokenList);
         TokenList = NULL;                 /* end loop */
       }
-      else Run = False;       /* unknown keyword */
+      else                    /* unknown keyword */
+      {
+        Run = False;
+        LogBadKeyword(TokenList->String);
+      }
 
       Get = 0;                       /* reset */      
     }
@@ -2362,9 +2758,10 @@ _Bool Cmd_SharedFileArea(Token_Type *TokenList)
   _Bool             Flag = False;       /* return value */
   _Bool             Run = True;         /* control flag */
   unsigned short    Keyword = 0;        /* keyword ID */
-  char              *Name = NULL;
-  char              *Path = NULL;
-  char              *Info = NULL;
+  char              *Name = NULL;       /* fileecho name */
+  char              *Path = NULL;       /* fileecho path */
+  char              *Info = NULL;       /* fileecho description */
+  int               Depth = 0;          /* depth of recursion */
   static char       *Keywords[8] =
     {"SharedFileArea", "Name", "Path", "Info", "PW",
      "Depth", "AutoMagic", NULL};
@@ -2393,6 +2790,16 @@ _Bool Cmd_SharedFileArea(Token_Type *TokenList)
 
         case 4:     /* info */
           Info = TokenList->String;
+          break;
+
+        case 6:     /* depth */
+          Depth = Str2Long(TokenList->String);
+          if ((Depth < 0) || (Depth > 10))    /* invalid value */
+          {
+            Log(L_WARN, "Invalid recursion depth!");
+            Run = False;           /* end loop & signal problem */
+          }
+          break;
 
         /* Other keywords with values belong to mfreq-index,
            so we simply skip them. */
@@ -2408,6 +2815,7 @@ _Bool Cmd_SharedFileArea(Token_Type *TokenList)
       {
         case 0:               /* unknown keyword */
           Run = False;
+          LogBadKeyword(TokenList->String);
           break;
 
         case 1:               /* command itself */
@@ -2443,7 +2851,7 @@ _Bool Cmd_SharedFileArea(Token_Type *TokenList)
   if (Run)
   {
     /* open path and process files */
-    Flag = ProcessPath(Name, Path, Info);
+    Flag = ManagePath(Name, Path, Info, Depth, False);
   }
 
   return Flag;
@@ -2465,11 +2873,12 @@ _Bool Cmd_FileArea(Token_Type *TokenList)
   _Bool             Flag = False;       /* return value */
   _Bool             Run = True;         /* control flag */
   unsigned short    Keyword = 0;        /* keyword ID */
-  char              *Name = NULL;
-  char              *Path = NULL;
-  char              *Info = NULL;
-  static char       *Keywords[4] =
-    {"FileArea", "Path", "Info", NULL};
+  char              *Name = NULL;       /* fileecho name */
+  char              *Path = NULL;       /* fileecho path */
+  char              *Info = NULL;       /* fileecho description */
+  int               Depth = 0;          /* depth of recursion */
+  static char       *Keywords[5] =
+    {"FileArea", "Path", "Info", "Depth", NULL};
 
   /* sanity check */
   if (TokenList == NULL) return Flag;
@@ -2495,6 +2904,16 @@ _Bool Cmd_FileArea(Token_Type *TokenList)
 
         case 3:     /* info */
           Info = TokenList->String;
+          break;
+
+        case 4:     /* depth */
+          Depth = Str2Long(TokenList->String);
+          if ((Depth < 0) || (Depth > 10))    /* invalid value */
+          {
+            Log(L_WARN, "Invalid recursion depth!");
+            Run = False;           /* end loop & signal problem */
+          }
+          break;
       }
 
       Keyword = 0;             /* reset */
@@ -2503,7 +2922,11 @@ _Bool Cmd_FileArea(Token_Type *TokenList)
     {
       Keyword = GetKeyword(Keywords, TokenList->String);
 
-      if (Keyword == 0) Run = False;    /* unknown keyword */
+      if (Keyword == 0)       /* unknown keyword */
+      {
+        Run = False;
+        LogBadKeyword(TokenList->String);
+      }
     }
 
     TokenList = TokenList->Next;     /* goto to next token */
@@ -2528,7 +2951,7 @@ _Bool Cmd_FileArea(Token_Type *TokenList)
   if (Run)
   {
     /* open path and process files */
-    Flag = ProcessPath(Name, Path, Info);
+    Flag = ManagePath(Name, Path, Info, Depth, False);
   }
 
   return Flag;
@@ -2733,6 +3156,7 @@ _Bool Cmd_Reset(Token_Type *TokenList)
     {
       case 0:       /* unknown keyword */
         Run = False;
+        LogBadKeyword(TokenList->String);
         break;
 
       case 1:       /* command itself */
@@ -2813,6 +3237,7 @@ _Bool Cmd_InfoMode(Token_Type *TokenList)
     {
       case 0:       /* unknown keyword */
         Run = False;
+        LogBadKeyword(TokenList->String);
         break;
 
       case 1:       /* command itself */

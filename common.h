@@ -36,9 +36,9 @@
 
 /* about */
 #define PROJECT          "mfreq"
-#define VERSION          "v3.17"
+#define VERSION          "v3.18"
 #define VERSION_MAJOR    3
-#define VERSION_MINOR    17
+#define VERSION_MINOR    18
 #define COPYRIGHT        "(c) 1994-2017 by Markus Reschke"
 
 /* default paths */
@@ -389,6 +389,8 @@ typedef struct
   long              BPS;                /* speed (in bps) of connection */
   long              ReqTime;            /* time (in minutes) allowed */
   unsigned short    ReqFlags;           /* session/system flags */
+  char              *CallerID;          /* caller ID */
+  char              *SessionType;       /* session type */
   Request_Type      *RequestList;       /* request list (linked list) */
   Request_Type      *LastRequest;       /* pointer to last element in list */  
 

@@ -7,7 +7,7 @@
 
 ------------------------------------------------------------------------------
 
-Last edit: 2017-07-13
+Last edit: 2017-08-02
 
 
 * About
@@ -246,7 +246,7 @@ is consulted when the MagicPath or AreaDir command is executed.
 + FileArea Command
 
 Syntax:
-  FileArea <path> [PW <password>] [Depth <levels>] [AutoMagic]
+  FileArea <path> [PW <password>] [Depth <level>] [AutoMagic]
 
 With the FileArea command the files inside the given directory will be added
 to the internal file index (stored in RAM). Use this command for each of your
@@ -255,7 +255,7 @@ file areas/echos. If any file excludes are defined they'll be considered.
 A password may be specified optionally to limit access.
 
 The Depth argument enables directory recursion with a limit of the
-given levels. The level value should be in the range of 1 up to 10.  
+given level. The level value should be in the range of 1 up to 10.
 
 The AutoMagic switch will create a magic for each file with the file's
 extension dropped off. For example:
@@ -373,6 +373,19 @@ Values:
 
 Plain ASCII file containing one line with the description of the directory.
 
+Format:
+  <directory/filearea description>
+
+
++ filearea.bbs
+
+This is a new file used by mfreq-list to set the filearea name for sub
+directories in case of directory recursion. It's a plain ASCII file with
+just the filearea name.
+
+Format:
+  <filearea name>
+
 
 + descript.ion
 
@@ -383,6 +396,8 @@ Format:
 
 Long filenames are supported. Filenames with space(s) are enclosed in
 quotations marks.
+
+Hint: Not supported by mfreq-list yet.
 
 
 * Usage
@@ -516,11 +531,11 @@ Arguments:
   * SizePos <pos> SizeFormat <format>
   Enables file size field. Defines start position and format.
 
-  format   description                         examples
-  ---------------------------------------------------------
-  Bytes-8  bytes without unit, max. 8 digits   1234
-  Unit-8   bytes with unit, max. 8 chars       12kB, 12KiB
-  Short-8  bytes with short unit, max. chars   12k
+  format   description                          examples
+  ----------------------------------------------------------
+  Bytes-8  bytes without unit, max. 8 digits    1234
+  Unit-8   bytes with unit, max. 8 chars        12kB, 12KiB
+  Short-8  bytes with short unit, max. 8 chars  12k
 
   The size field is right-justified! So take care when defining the position!
   Leading zeros are omitted. When reading a files.bbs file mfreq-list accepts
@@ -548,7 +563,7 @@ Arguments:
   position! Leading zeros are omitted.
 
   * DescPos <pos>
-  Sets start position of file description.
+  Sets the start position of file description.
 
 
 + Define filelist Command
@@ -633,8 +648,8 @@ Syntax:
   Update      enable update of file description file
   Strict      enable strict position checking for data fields
   Skips       allow missing data fields behind filename
-  Relax       don't end processing of file description file on
-              syntax errors
+  Relax       don't end processing of file description file if any
+              syntax errors are detected
   AnyCase     match file names case-insensitive
   SI-Units    enable SI byte units
   IEC-Units   enable IEC byte units output
@@ -698,18 +713,26 @@ levels (main configuration is the first level).
 + FileArea Command
 
 Syntax:
-  FileArea <name> Path <path> [Info <description>]
+  FileArea <name> Path <path> [Info <description>] [Depth <level>]
 
 The FileArea command scans a directory and writes a sorted list of files to
-the current filelist. Specify the file echos name and path. The Info argument
-overrides any other source of the fileareas description.
+the current filelist. Specify the file echo's name and path. The Info argument
+overrides any other source of the filearea's description.
+
+The Depth argument enables directory recursion with a limit of the given
+level. The level value should be in the range of 1 up to 10. For sub
+directories the filearea name and description are taken from filearea.bbs
+and dir.bbs. Therefore please enable dir.bbs (see InfoMode). When no 
+filearea.bbs is found the sub directory's name will be used instead. If
+you set Info mfreq-list will ignore any dir.bbs files and use the given
+filearea description also for sub directories.
 
 
 + SharedFileArea Command
 
 Syntax:
   SharedFileArea Name <name> Path <path> [Info <description>]
-    [switches and options from mfreq-index]
+    [Depth <level>] [switches and options from mfreq-index]
 
 This is basically the same command like FileArea, but with a slightly
 changed syntax to share the command with mfreq-index. The mfreq-index specific
@@ -729,7 +752,6 @@ Some stuff which needs to be fixed or would be nice to have:
   - Support file_id.diz? Try to extract?
   - Ignore a missing directory and keep processing?
   - Verbose logging (including cfg switch)?
-  - Support recursion for directories ("Depth" option)? 
 
 
 
