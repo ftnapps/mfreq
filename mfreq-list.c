@@ -2,7 +2,7 @@
  *
  *   mfreq-list
  *
- *   (c) 1994-2017 by Markus Reschke
+ *   (c) 1994-2018 by Markus Reschke
  *
  * ************************************************************************ */
 
@@ -1137,6 +1137,13 @@ _Bool Read_files_bbs(char *Path)
       else                     /* EOF or error */
       {
         Run = False;        /* end loop */
+
+        /* check for error */
+        if (ferror(File) != 0)
+        {
+          Flag = False;            /* signal problem */
+          Log(L_WARN, "Read error for %s!", TempBuffer2);
+        }
       }
     }
 
@@ -1324,6 +1331,14 @@ char *Read_dir_bbs(char *Path)
         }
       }
     }
+    else                     /* EOF or error */
+    {
+      /* check for error */
+      if (ferror(File) != 0)
+      {
+        Log(L_WARN, "Read error for %s!", TempBuffer2);
+      }
+    }
 
     fclose(File);            /* close file */
   }
@@ -1432,6 +1447,14 @@ char *Read_filearea_bbs(char *Path)
         {
           Info = CopyString(InBuffer);
         }
+      }
+    }
+    else                     /* EOF or error */
+    {
+      /* check for error */
+      if (ferror(File) != 0)
+      {
+        Log(L_WARN, "Read error for %s!", TempBuffer2);
       }
     }
 
@@ -3632,7 +3655,14 @@ _Bool ReadConfig(char *Filepath)
       }
       else                    /* EOF or error */
       {
-        Run = False;          /* end loop */
+        Run = False;               /* end loop */
+
+        /* check for error */
+        if (ferror(File) != 0)
+        {
+          Flag = False;            /* signal problem */
+          Log(L_WARN, "Read error cfg file (%s)!", Filepath);
+        }
       }
     }
 
@@ -3752,14 +3782,14 @@ _Bool ParseCommandLine(int argc, char *argv[])
    *  check parser results
    */
 
-  if (Keyword > 0)             /* missing arguement  */
+  if (Keyword > 0)            /* missing argument */
   {
     Log(L_WARN, "Missing argument!");
     Flag = False;
   }
 
   /* check if we got all required options */
-  if (Flag)           /* if everything's fine so far */
+  if (Flag && Env->Run)       /* if everything's fine so far */
   {
     /* set default config filepath */
     if (Env->CfgFilepath == NULL)

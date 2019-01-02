@@ -3,11 +3,11 @@
 
                             ReadMe for mfreq suite
 
-                       (c) 1994-2017 by Markus Reschke
+                       (c) 1994-2019 by Markus Reschke
 
 ------------------------------------------------------------------------------
 
-Last edit: 2017-08-02
+Last edit: 2019-01-02
 
 
 * About
@@ -49,6 +49,11 @@ All files of the mfreq suite are copyrighted by Markus Reschke.
 
 The mfreq suite is distributed under the EUPL v1.1. For details see 
 EUPL-v1.1.pdf or http://joinup.ec.europa.eu/software/page/eupl.
+
+
+* Acknowledgements
+
+The SRIF protcol is described in FSC-0086 (see http://www.ftsc.org).
 
 
 
@@ -103,7 +108,7 @@ sample-cfg directory.
 + Basic Syntax
 
 Empty lines and lines starting with a "#" are treated as comments. Any other
-lines should contain a valid command. Commands mostly got additional arguments
+lines should contain a valid command. Commands mostly have additional arguments
 and options. Arguments with spaces, like a filepath, should be enclosed in
 quotation marks, for example "/fido/my files".
 
@@ -155,7 +160,7 @@ is supported just for regular files, not magics.
 The AnyCase switch causes the index to be sorted differently for supporting
 case-insensitive filename search by the frequest processor.
 
-If you got a large filebase with tons of files you should enable the binary
+If you have a large filebase with tons of files you should enable the binary
 search feature to speed up filename searching for simple requests (no wildcard
 as first character). Enable this feature for the request processor too. The
 speed gain is achieved by creating an additional index file (offset) and using
@@ -300,10 +305,10 @@ to the specified filepath. Following files will be written (based on SetMode):
 After writing the index the internal file index buffer is emptied. Any new
 files are added to file index buffer again, until another Index command will
 write those files to a new index and so on. This might come in handy if you
-got memory contraints or if you need different file indexes for whatever
+have memory contraints or if you need different file indexes for whatever
 reason.
 
-Hint: The number of files per index are limited to 1000000. If you got more
+Hint: The number of files per index are limited to 1000000. If you have more
 files, please create multiple indexes.
 
 
@@ -427,7 +432,7 @@ directory.
 + Basic Syntax
 
 Empty lines and lines starting with a "#" are treated as comments. Any other
-lines should contain a valid command. Commands mostly got additional arguments
+lines should contain a valid command. Commands mostly have additional arguments
 and options. Arguments with spaces, like a filepath, should be enclosed in
 quotation marks, for example "/fido/my files".
 
@@ -671,14 +676,14 @@ and keeps processing. So you'll get a filelist in any case. But be warned that
 the Relax switch may cause a lot of warnings being logged. If you set Relax
 and Update you can convert file descriptions files into the desired format. 
 
-When you got issues with the case-sensitivity of filenames on disk and in the
+When you have issues with the case-sensitivity of filenames on disk and in the
 file description file, you can enable AnyCase to match the filenames case-
 insensitive. For example, if the filenames on disk are lower case and the
-filenames in the files.bbs are upper case. Make sure that you don't got any
+filenames in the files.bbs are upper case. Make sure that you don't have any
 filename doubles when case-insensitive matching is applied. For double
 filenames on disk the first one found will get the file description. Any other
 double is treated as a new file not in the file description file yet. If you
-got doubles in the file description file, all descriptions of all doubles will
+have doubles in the file description file, all descriptions of all doubles will
 be added to the first matching filename found on disk.
  
 The SI-Units switch enables metric unit prefixes for any input and output, i.e.
@@ -752,6 +757,7 @@ Some stuff which needs to be fixed or would be nice to have:
   - Support file_id.diz? Try to extract?
   - Ignore a missing directory and keep processing?
   - Verbose logging (including cfg switch)?
+  - Auto-wrapping for file description when exceeding DescWidth?
 
 
 
@@ -862,7 +868,7 @@ configuration "srif.cfg" in the sample-cfg directory.
 + Basic Syntax
 
 Empty lines and lines starting with a "#" are treated as comments. Any other
-lines should contain a valid setting. Settings mostly got additional arguments
+lines should contain a valid setting. Settings mostly have additional arguments
 and options. Arguments with spaces, like a filepath, should be enclosed in
 quotation marks, for example "/fido/my files".
 

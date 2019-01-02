@@ -2,7 +2,7 @@
  *
  *   common header file
  *
- *   (c) 1994-2017 by Markus Reschke
+ *   (c) 1994-2019 by Markus Reschke
  *
  * ************************************************************************ */
 
@@ -36,16 +36,16 @@
 
 /* about */
 #define PROJECT          "mfreq"
-#define VERSION          "v3.18"
+#define VERSION          "v3.19"
 #define VERSION_MAJOR    3
-#define VERSION_MINOR    18
-#define COPYRIGHT        "(c) 1994-2017 by Markus Reschke"
+#define VERSION_MINOR    19
+#define COPYRIGHT        "(c) 1994-2019 by Markus Reschke"
 
 /* default paths */
 #define DEFAULT_CFG_PATH      "/etc/fido/mfreq"
 #define DEFAULT_TMP_PATH      "/var/tmp"
 
-/* buffers (must not exceed maximum size of an Integer */
+/* buffer size (must not exceed the maximum value of an Integer */
 #define DEFAULT_BUFFER_SIZE   4096           /* standard buffer size */
 
 /* fileindex */

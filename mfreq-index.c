@@ -2,7 +2,7 @@
  *
  *   mfreq-index
  *
- *   (c) 1994-2017 by Markus Reschke
+ *   (c) 1994-2018 by Markus Reschke
  *
  * ************************************************************************ */
 
@@ -91,7 +91,7 @@ IndexData_Type *MergeSort(IndexData_Type *List, IndexData_Type **Last)
    */
 
   StepSize = 1;       /* start with sublists with one element each */
-                      /* a 1 element sublist is sorted by definition :-) */
+                      /* an 1 element sublist is sorted by definition :-) */
 
   NewList = List;     /* initialize new list for first loop run */
 
@@ -118,7 +118,7 @@ IndexData_Type *MergeSort(IndexData_Type *List, IndexData_Type **Last)
       RightSub = LeftSub;      /* starting point */
       LeftSize = 0;            /* reset size */
 
-      /* as long as we don't reach the lists end move SubSize elements to the right */
+      /* as long as we don't reach the list's end move SubSize elements to the right */
       while (RightSub && (LeftSize < StepSize))
       {
         LeftSize++;                     /* increase size of left sublist */
@@ -380,6 +380,12 @@ _Bool ReadMagicFile(char *Filename)
       else                     /* EOF or error */
       {
         Run = False;        /* end loop */
+
+        /* check for error */
+        if (ferror(File) != 0)
+        {
+          Log(L_WARN, "Read error for magic file (%s)!", Filename);
+        }
       }
     }
 
@@ -1025,7 +1031,7 @@ _Bool WriteIndex(char *Filepath)
    *
    *  format: <name>0x1F<filepath>[0x1F<password>]LF
    *  We use the ascii unit separator 31 (octal 037) as field separator.
-   *  <filepath>: <path>/[<filename>] or %<alias offset>%/[filename]
+   *  <filepath>: <path>/[<filename>] or %<alias offset>%/[<filename>]
    *  - %<alias offset>% for automatic path aliasing
    *  - <filename> can be omitted if same as <name>
    */
@@ -2350,7 +2356,14 @@ _Bool ReadConfig(char *Filepath)
       }
       else                    /* EOF or error */
       {
-        Run = False;          /* end loop */
+        Run = False;               /* end loop */
+
+        /* check for error */
+        if (ferror(File) != 0)
+        {
+          Flag = False;            /* signal problem */
+          Log(L_WARN, "Read error for cfg file (%s)!", Filepath);
+        }
       }
     }
 
@@ -2470,14 +2483,14 @@ _Bool ParseCommandLine(int argc, char *argv[])
    *  check parser results
    */
 
-  if (Keyword > 0)             /* missing arguement  */
+  if (Keyword > 0)            /* missing arguement  */
   {
     Log(L_WARN, "Missing argument!");
     Flag = False;
   }
 
   /* check if we got all required options */
-  if (Flag)           /* if everything's fine so far */
+  if (Flag && Env->Run)       /* if everything's fine so far */
   {
     /* set default config filepath */
     if (Env->CfgFilepath == NULL)

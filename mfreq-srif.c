@@ -2,7 +2,7 @@
  *
  *   mfreq-srif (SRIF compatible frequest handler based on fsc-0086.001)
  *
- *   (c) 1994-2017 by Markus Reschke
+ *   (c) 1994-2018 by Markus Reschke
  *
  * ************************************************************************ */
 
@@ -434,7 +434,14 @@ _Bool ReadIndexLookup(char *Filepath)
       }
       else                     /* EOF or error */
       {
-        Run = False;        /* end loop */
+        Run = False;               /* end loop */
+
+        /* check for error */
+        if (ferror(File) != 0)
+        {
+          Flag = False;            /* signal problem */
+          Log(L_WARN, "Read error for index lookup file (%s)!", Filepath);
+        }
       }
     }
 
@@ -1823,7 +1830,13 @@ _Bool ReadRequest()
       }
       else                     /* EOF or error */
       {
-        Run = False;        /* end loop */
+        Run = False;               /* end loop */
+
+        /* check for error */
+        if (ferror(File) != 0)
+        {
+          Log(L_WARN, "Read error for request file!");
+        }
       }
     }
 
@@ -1991,7 +2004,11 @@ _Bool ParseSRIF(Token_Type *TokenList)
     {
       Keyword = GetKeyword(Keywords, TokenList->String);
 
-      if (Keyword == 0) Run = False;    /* unknown keyword */
+      if (Keyword == 0)       /* unknown keyword */
+      {
+        Run = False;               /* end loop */
+        Log(L_WARN, "Unknown keyword in SRIF (%s)!", TokenList->String);
+      }
     }
 
     TokenList = TokenList->Next;     /* goto to next token */
@@ -2011,7 +2028,7 @@ _Bool ParseSRIF(Token_Type *TokenList)
 
 
 /*
- *  read SRI file
+ *  read SRIF
  *
  *  returns:
  *  - 1 on success
@@ -2077,7 +2094,14 @@ _Bool ReadSRIF()
       }
       else                     /* EOF or error */
       {
-        Run = False;        /* end loop */
+        Run = False;               /* end loop */
+
+        /* check for error */
+        if (ferror(File) != 0)
+        {
+          Flag = False;            /* signal problem */
+          Log(L_WARN, "Read error for SRIF!");
+        }
       }
     }
 
@@ -2120,7 +2144,7 @@ _Bool CheckSRIF()
   }
   else
   {
-    Log(L_WARN, "Required settings are missing in SRI file!");
+    Log(L_WARN, "Required settings are missing in SRIF!");
   }
 
 
@@ -2965,7 +2989,14 @@ _Bool ReadConfig(char *Filepath)
       }
       else                     /* EOF or error */
       {
-        Run = False;        /* end loop */
+        Run = False;               /* end loop */
+
+        /* check for error */
+        if (ferror(File) != 0)
+        {
+          Flag = False;            /* signal problem */
+          Log(L_WARN, "Read error for cfg file (%s)!", Filepath);
+        }
       }
     }
 
@@ -3077,7 +3108,7 @@ _Bool ParseCommandLine(int argc, char *argv[])
     {
       switch (Keyword)
       {
-        case 3:     /* cfg file */
+        case 3:     /* cfg filepath */
           if (Env->CfgFilepath)      /* free old value if already set */
           {
             free(Env->CfgFilepath);
@@ -3086,7 +3117,7 @@ _Bool ParseCommandLine(int argc, char *argv[])
           Env->CfgFilepath = CopyString(argv[n]);
           break;
 
-        case 4:     /* log file */
+        case 4:     /* log filepath */
           if (Env->LogFilepath)      /* free old value if already set */
           {
             free(Env->LogFilepath);
@@ -3095,7 +3126,7 @@ _Bool ParseCommandLine(int argc, char *argv[])
           Env->LogFilepath = CopyString(argv[n]);
           break;
 
-        case 5:     /* SRI file */
+        case 5:     /* SRIF filepath */
           if (Env->SRIF_Filepath)    /* free old value if already set */
           {
             free(Env->SRIF_Filepath);
@@ -3133,14 +3164,14 @@ _Bool ParseCommandLine(int argc, char *argv[])
    *  check parser results
    */
 
-  if (Keyword > 0)             /* missing argument  */
+  if (Keyword > 0)            /* missing argument  */
   {
     Log(L_WARN, "Missing argument!");
     Flag = False;
   }
 
   /* check if we got all required options */
-  if (Flag)           /* if everything's fine so far */
+  if (Flag && Env->Run)       /* if everything's fine so far */
   {
     /* we must have the SRIF filepath */
     if (Env->SRIF_Filepath == NULL)
@@ -3264,7 +3295,7 @@ _Bool GetAllocations(void)
     Env->Log = NULL;
 
     /* environment: program control */
-    Env->Run = True;
+    Env->Run = True;          /* run by default */
     Env->CfgInUse = NULL;
     Env->CfgLinenumber = 0;
 
@@ -3424,7 +3455,7 @@ int main(int argc, char *argv[])
 
   if (GetAllocations())                 /* allocate global variables */
   {
-    if (ParseCommandLine(argc, argv))   /* parse local cmd line options */
+    if (ParseCommandLine(argc, argv))   /* parse cmd line options */
     {
       Flag = True;                      /* ok for next part */
     }
@@ -3455,7 +3486,7 @@ int main(int argc, char *argv[])
     {
       if (CheckConfig())                /* check cfg for required stuff */
       {
-        if (ReadSRIF())                 /* read SRI file */
+        if (ReadSRIF())                 /* read SRIF */
         {
           if (CheckSRIF())              /* check SRIF for required stuff */
           {

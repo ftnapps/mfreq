@@ -6,6 +6,12 @@
 
 ------------------------------------------------------------------------------
 
+* 2019-01 / Version 3.19
+
+all:
+  - Minor improvements.
+
+
 * 2017-07 / Version 3.18
 
 all:
@@ -17,7 +23,7 @@ mfreq-list:
   - Fixed problem with right-justified data fields in parser for files.bbs (
     reported by Ingo Jürgensmann 2:2452/413)
   - Fixed issue with error handling in Cmd_Define_filelist() (reported by
-    Ingo Jürgensmann 2:2452/413.
+    Ingo Jürgensmann 2:2452/413).
 
 mfreq-srif:
   - Added support for SRIF statements CallerID and SessionType. 
